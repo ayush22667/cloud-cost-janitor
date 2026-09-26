@@ -1,8 +1,5 @@
 # Cloud Cost Janitor: how it works
 
-This is the design document. `README.md` tells you how to run it; this file explains what the pieces
-are, how a request moves through them, and why the safety checks sit where they sit.
-
 ## The problem
 
 Every AWS account collects leftovers. An instance nobody has logged into for weeks. EBS volumes that
@@ -247,17 +244,13 @@ failures and deletions with snapshot ids. It never holds identity or credentials
 
 ```mermaid
 flowchart LR
-    B["Browser<br/>localhost:8790"] --> TF["TrueForge<br/>npx @truefoundry/trueforge<br/>allowlist 127.0.0.1"]
-    TF -- "Bearer COST_JANITOR_TOKEN" --> J["aws-janitor<br/>127.0.0.1:8000/mcp"]
-    TF --> X["aws-api<br/>127.0.0.1:8001/mcp"]
-    TF -- git clone at tag --> GH[("github.com/ayush22667/cloud-cost-janitor<br/>skills/cloud-cost-audit")]
+    B[Browser] --> TF[TrueForge]
+    TF -- bearer token --> J[aws-janitor MCP server]
+    TF --> X[aws-api MCP server]
+    TF -- skill, cloned at a pinned tag --> GH[(GitHub repository)]
     J --> AWS[(AWS)]
     X --> AWS
 ```
-
-Both MCP servers bind to loopback. TrueForge's outbound guard blocks loopback by default, so it is
-started with `OUTBOUND_URL_ALLOWED_HOSTS='["127.0.0.1","localhost"]'`. `trueforge/setup.sh` registers
-the two connectors, the skill at its pinned tag, and the agent, through the local API.
 
 ## Known limits
 
