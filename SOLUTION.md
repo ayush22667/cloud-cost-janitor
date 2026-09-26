@@ -252,13 +252,3 @@ flowchart LR
     X --> AWS
 ```
 
-## Known limits
-
-- The delete-time check re-reads state and target health, not traffic or CPU. A machine that got busy
-  inside the one-hour plan window would still be terminated on Allow.
-- Auto Scaling group members are not excluded; terminating one only triggers a replacement.
-- Stopped instances are flagged however recently they stopped.
-- Load balancer costs exclude LCU charges; instance costs are on-demand only.
-- `get_actual_spend` needs Cost Explorer enabled by the account's root user.
-- AWS only. The core is provider-agnostic and the provider interface is small, but there is one
-  implementation.
