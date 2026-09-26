@@ -2,8 +2,8 @@
 
 Python 3.12 project managed with **uv**. An MCP server (FastMCP 4) that finds idle AWS resources,
 prices them, plans a teardown, and deletes only through an approval-gated tool used by a TrueForge agent.
-Read `SOLUTION.md` first (architecture, request flow, safety chain, with diagrams), then `PLAN.md`
-(the rules and the build log).
+Read `PLAN.md` first: it holds the architecture, the rules, and the build log. `SOLUTION.pdf` is the
+one-page summary for readers outside the repo.
 
 ## Commands
 - Install: `uv sync`
