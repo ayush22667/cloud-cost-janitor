@@ -13,6 +13,21 @@ def _tags(raw: list[dict] | None) -> dict[str, str]:
     return {t["Key"]: t["Value"] for t in (raw or [])}
 
 
+# Error codes AWS uses when a resource id is unknown or malformed. Any of these means "does not exist".
+_NOT_FOUND_CODES = {
+    "InvalidInstanceID.NotFound",
+    "InvalidInstanceID.Malformed",
+    "InvalidVolume.NotFound",
+    "InvalidVolumeID.Malformed",
+    "InvalidParameterValue",
+}
+
+
+def _is_not_found(err: Exception) -> bool:
+    code = getattr(err, "response", {}).get("Error", {}).get("Code", "")
+    return code in _NOT_FOUND_CODES
+
+
 def _name(tags: dict[str, str], fallback: str) -> str:
     return tags.get("Name") or fallback
 
@@ -86,7 +101,7 @@ def get_instance(clients: AwsClients, region: str, instance_id: str) -> Instance
     try:
         resp = ec2.describe_instances(InstanceIds=[instance_id])
     except ec2.exceptions.ClientError as e:  # type: ignore[attr-defined]
-        if "InvalidInstanceID" in str(e):
+        if _is_not_found(e):
             return None
         raise
     raws = [i for r in resp["Reservations"] for i in r["Instances"]]
@@ -126,7 +141,7 @@ def get_volume(clients: AwsClients, region: str, volume_id: str) -> Volume | Non
     try:
         resp = ec2.describe_volumes(VolumeIds=[volume_id])
     except ec2.exceptions.ClientError as e:  # type: ignore[attr-defined]
-        if "InvalidVolume" in str(e):
+        if _is_not_found(e):
             return None
         raise
     vols = resp.get("Volumes", [])

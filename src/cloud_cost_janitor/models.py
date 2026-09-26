@@ -187,6 +187,7 @@ class TeardownPlan(_Serialisable):
     regions: list[str]
     findings: list[Finding]
     steps: list[TeardownStep]
-    total_monthly_waste_usd: float
+    total_monthly_waste_usd: float  # every finding with a price, protected or not
+    planned_saving_usd: float  # only what the steps would actually remove
     protected_count: int
     unpriced_count: int
