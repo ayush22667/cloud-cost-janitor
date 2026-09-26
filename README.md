@@ -95,8 +95,9 @@ that reflects how many days of data exist, so a resource created this morning is
 
 ## Setup
 
-Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ (for TrueForge), the AWS CLI
-configured with credentials for **your own** account (`ec2:Describe*`, `elasticloadbalancing:Describe*`,
+Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ (for TrueForge), on macOS a
+Homebrew `git` (`brew install git` — TrueForge's local sandbox cannot run Apple's `/usr/bin/git` shim, so
+skills fail to clone without it), and the AWS CLI configured with credentials for **your own** account (`ec2:Describe*`, `elasticloadbalancing:Describe*`,
 `cloudwatch:GetMetricStatistics`; plus `ec2:CreateSnapshot`, `ec2:DeleteVolume`, `ec2:TerminateInstances`,
 `elasticloadbalancing:DeleteLoadBalancer` for live mode).
 

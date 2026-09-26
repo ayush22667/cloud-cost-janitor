@@ -173,5 +173,5 @@ Every directory has an `AGENTS.md` (purpose, rules for that directory, how to te
 - [x] Step 10 — full rehearsal through the agent: audit → Code Mode aggregation → Generative UI → question → Deny (nothing changed) → stale plan refused → fresh plan → Allow → snapshots + real deletion verified in AWS
 - [x] Step 11 (docs) — README written, secret scan clean, disclosure worded; agent re-verified on Kimi K3
 - [x] TrueForge skill `skills/cloud-cost-audit` written (playbook + reference aggregation script); `setup.sh` attaches it via `SKILL_REPO_URL` once the repo is public, otherwise registers inline instructions
-- [ ] Publish public repo → re-run `SKILL_REPO_URL=… bash trueforge/setup.sh` → rehearse once with the skill attached
+- [x] Published https://github.com/ayush22667/cloud-cost-janitor (CI green); skill attached via `SKILL_REPO_URL`; rehearsal with the skill loaded passed (needed Homebrew git for the macOS sandbox, documented in README)
 - [ ] Step 12 — optional polish
