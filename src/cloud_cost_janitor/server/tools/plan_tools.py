@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from cloud_cost_janitor.planner import build_plan
+from cloud_cost_janitor.providers.aws.metrics import clamp_lookback
 from cloud_cost_janitor.providers.base import ProviderError
 from cloud_cost_janitor.rules import evaluate_all
 from cloud_cost_janitor.server.context import ServerContext
@@ -36,6 +37,11 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
         stateful delete, totals, and a plan_id valid for one hour. The plan_id is REQUIRED by mark_for_teardown and
         delete_resource. Read-only; nothing is changed."""
         target = list(regions or ctx.settings.regions)
+        try:
+            clamp_lookback(instance_lookback_days)
+            clamp_lookback(lb_lookback_days)
+        except ValueError as e:
+            raise ToolError(str(e)) from e
         findings = []
         scanned: dict[str, int] = {"instances": 0, "unattached_volumes": 0, "load_balancers": 0}
         try:
@@ -52,6 +58,16 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
 
         plan = build_plan(findings, regions=target, settings=ctx.settings)
         ctx.plans.add(plan)
+        ctx.audit.record(
+            "plan.created",
+            plan_id=plan.plan_id,
+            regions=target,
+            scanned=scanned,
+            findings=[f.resource_id for f in plan.findings],
+            total_monthly_waste_usd=plan.total_monthly_waste_usd,
+            planned_saving_usd=plan.planned_saving_usd,
+            expires_at=plan.expires_at,
+        )
         return {
             "summary": _summary(plan),
             "scanned": scanned,

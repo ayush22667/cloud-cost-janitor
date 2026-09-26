@@ -1,17 +1,21 @@
 """Reference aggregation for the cloud-cost-audit skill (runs inside the TrueForge sandbox).
 
-Calls generate_cost_report through the sandbox's MCP bridge and prints totals. Adapt as needed; write
-your own version rather than running this file unchanged.
+Fetches the plan you already generated (by plan_id) through the sandbox's MCP bridge and prints
+totals. It does not rescan the account. Adapt as needed; write your own version rather than running
+this file unchanged.
 """
 
 import asyncio
+import sys
 from collections import defaultdict
 
 from mcp_client import call_tool
 
+PLAN_ID = sys.argv[1] if len(sys.argv) > 1 else "PUT-THE-PLAN-ID-HERE"
+
 
 async def main() -> None:
-    report = await call_tool("aws-janitor", "generate_cost_report", body={"regions": ["us-east-1"]})
+    report = await call_tool("aws-janitor", "get_plan", body={"plan_id": PLAN_ID})
     plan = report["plan"]
     findings = plan["findings"]
 

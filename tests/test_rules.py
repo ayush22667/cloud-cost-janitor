@@ -156,3 +156,9 @@ def test_evaluate_all_dispatches_and_filters():
 def test_evaluate_rejects_unknown_type():
     with pytest.raises(TypeError):
         evaluate(object(), SETTINGS)  # type: ignore[arg-type]
+
+
+def test_protection_is_case_insensitive():
+    for tags in ({"Environment": "production"}, {"ENV": "PROD"}, {"janitor:KEEP": "True"}):
+        f = evaluate_instance(instance(tags=tags, metrics=UtilisationMetrics(14, 96, days(4))), SETTINGS)
+        assert f and f.protected, tags

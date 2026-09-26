@@ -91,6 +91,14 @@ class AwsProvider(CloudProvider):
         return ec2.snapshot_volume(self._c, region, volume_id, description=description, tags=tags)
 
     @_wrap
+    def find_snapshot(self, region: str, volume_id: str, plan_id: str) -> str | None:
+        return ec2.find_snapshot(self._c, region, volume_id, plan_id)
+
+    @_wrap
+    def snapshot_state(self, region: str, snapshot_id: str) -> str | None:
+        return ec2.snapshot_state(self._c, region, snapshot_id)
+
+    @_wrap
     def tag_resources(self, region: str, resource_ids: list[str], tags: dict[str, str]) -> None:
         arns = [r for r in resource_ids if r.startswith("arn:")]
         ids = [r for r in resource_ids if not r.startswith("arn:")]

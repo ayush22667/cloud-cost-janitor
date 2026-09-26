@@ -42,6 +42,7 @@ class Settings:
     lb_lookback_days: int = 7
     plan_ttl_seconds: int = 3600
     provider: str = "aws"
+    audit_log: str = "janitor-audit.jsonl"  # append-only JSONL; never contains identity or credentials
     # --- identity (exactly one of profile / key pair; role is optional on top) ---
     aws_profile: str | None = None
     aws_access_key_id: str | None = field(default=None, repr=False)
@@ -87,6 +88,7 @@ def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
         host=os.environ.get("JANITOR_HOST", "127.0.0.1"),
         port=int(os.environ.get("JANITOR_PORT", "8000")),
         provider=os.environ.get("CLOUD_PROVIDER", "aws").lower(),
+        audit_log=os.environ.get("JANITOR_AUDIT_LOG", "janitor-audit.jsonl"),
         aws_profile=_env("AWS_PROFILE"),
         aws_access_key_id=_env("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=_env("AWS_SECRET_ACCESS_KEY"),

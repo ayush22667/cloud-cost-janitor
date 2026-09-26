@@ -23,6 +23,7 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
             start, end, rows = ctx.provider.actual_spend(days=days, group_by=group_by)
         except ProviderError as e:
             raise ToolError(str(e)) from e
+        ctx.audit.record("spend.read", days=days, group_by=group_by, total_usd=round(sum(r.amount_usd for r in rows), 2))
         return {
             "period": {"start": start, "end": end},
             "group_by": group_by,

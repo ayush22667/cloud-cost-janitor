@@ -80,6 +80,14 @@ class CloudProvider(ABC):
         """Create a snapshot; return its id."""
 
     @abstractmethod
+    def find_snapshot(self, region: str, volume_id: str, plan_id: str) -> str | None:
+        """Id of a snapshot this janitor already took of the volume for this plan, if any (idempotent retries)."""
+
+    @abstractmethod
+    def snapshot_state(self, region: str, snapshot_id: str) -> str | None:
+        """'pending' | 'completed' | 'error' | None when the snapshot does not exist."""
+
+    @abstractmethod
     def tag_resources(self, region: str, resource_ids: list[str], tags: dict[str, str]) -> None: ...
 
     @abstractmethod

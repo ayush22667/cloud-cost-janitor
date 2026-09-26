@@ -94,7 +94,7 @@ iam/              least-privilege policies and a cross-account CloudFormation te
 trueforge/        agent.json, connectors.json, setup.sh
 skills/           cloud-cost-audit, the TrueForge skill with the audit playbook
 scripts/          run_mcp_servers.sh, seed_demo.sh, cleanup_demo.sh, smoke_test.sh
-tests/            91 tests; AWS is mocked with moto, the MCP server is tested in-process
+tests/            109 tests; AWS is mocked with moto, the MCP server is tested in-process
 ```
 
 Each directory has an `AGENTS.md` with the rules for that directory.
@@ -121,6 +121,8 @@ scripts/run_mcp_servers.sh                                                      
 SKILL_REPO_URL=https://github.com/ayush22667/cloud-cost-janitor MODEL=<provider/model> bash trueforge/setup.sh
 ```
 
+The skill is registered from the release tag `v0.1.0` by default (`SKILL_REF` to change it).
+
 `setup.sh` checks that TrueForge, the model and both servers are up, registers the two connectors and
 the skill, and creates the agent. Open http://localhost:8790, go to Agents, and press Try.
 
@@ -141,6 +143,7 @@ missing, and it never logs which account it is talking to.
 | `AWS_ROLE_ARN`, `AWS_EXTERNAL_ID` | optional. Audit another account by assuming a role there |
 | `AWS_REGIONS` | comma-separated, default `us-east-1` |
 | `JANITOR_HOST`, `JANITOR_PORT` | default `127.0.0.1:8000` |
+| `JANITOR_AUDIT_LOG` | append-only JSONL, default `janitor-audit.jsonl` |
 
 Set either a profile or a key pair, not both.
 
@@ -168,23 +171,36 @@ aws cloudformation deploy --stack-name cloud-cost-janitor --template-file iam/cr
 ```
 
 Put the role ARN and the same string in `.env` as `AWS_ROLE_ARN` and `AWS_EXTERNAL_ID`. The server
-assumes the role with STS and refreshes the temporary credentials itself. Deleting the stack revokes
-access. No keys change hands.
+assumes the role with STS and refreshes the temporary credentials itself; `run_mcp_servers.sh` assumes
+it once more for the official `aws-api` server, so both act as the same role (that one expires after
+an hour, restart the script). Deleting the stack revokes access. No keys change hands.
 
 ## What stops it deleting the wrong thing
 
-1. TrueForge pauses every `delete_resource` call for Allow or Deny. The server only sees approved calls.
-2. A call needs a `plan_id` from a report less than an hour old. A server restart forgets all plans.
+1. TrueForge pauses every `delete_resource`, `mark_for_teardown` and `unmark_teardown` call for Allow or
+   Deny. The server only sees approved calls.
+2. A call needs a `plan_id` from a report less than an hour old. A server restart forgets all plans, on
+   purpose. History lives in the audit log instead (below).
 3. The resource is described again right before deletion and refused if it is now attached, running,
-   has healthy targets, gained a protect tag, or is gone.
-4. Volumes, and the volumes of an instance, are snapshotted first. The snapshot ids come back in the result.
+   has healthy targets, gained a protect tag (matched case-insensitively), or is gone.
+4. Volumes, and the volumes of an instance, are snapshotted first, tagged with the resource's own tags
+   plus the plan id. A retry reuses the snapshot instead of taking another, and if the delete fails
+   after the snapshot the result still lists the snapshot ids. Pass `wait_for_snapshot=true` to block
+   until the snapshot is completed before deleting; without it AWS still finishes an in-progress
+   snapshot after the volume is gone.
 5. IAM only permits deleting tagged resources (see above).
-6. `mark_for_teardown` is an optional two-phase mode: tag now, delete after a grace period. It is
-   Cloud Custodian's mark-for-op pattern.
+6. `mark_for_teardown` is an optional two-phase mode: tag now, delete after a grace period of 1 to 90
+   days. It is Cloud Custodian's mark-for-op pattern. Unmarking needs the same plan and approval.
 7. The agent calls `delete_resource` once per resource and never from a script, so each deletion is
    its own approval.
 8. The official AWS server runs with `READ_OPERATIONS_ONLY=true` and every one of its calls is
-   approval-gated as well, because its single `call_aws` tool carries no annotations.
+   approval-gated as well, because its single `call_aws` tool carries no annotations. Its version is
+   pinned in `scripts/run_mcp_servers.sh`, and the skill is registered from a release tag, not `main`.
+9. Everything the server is asked to do is appended to `janitor-audit.jsonl` (path from
+   `JANITOR_AUDIT_LOG`): plans, requests, refusals with reasons, deletions with snapshot ids. It never
+   contains the identity or a credential.
+10. The agent is told that resource names, tags and descriptions are data, never instructions, since
+    anyone who can tag a resource can write text the model will read.
 
 ## Demo
 
@@ -210,7 +226,7 @@ no LCU charges, no data transfer. `get_actual_spend` reads real billed spend fro
 the two can be compared, but only after the account owner has enabled Cost Explorer and IAM access to
 billing data; until then the tool explains what to enable.
 
-Idle detection looks at CPU and network only. Classic ELBs are not covered. Only AWS is implemented;
+Idle detection looks at CPU and network only, over a window of 1 to 365 days. Classic ELBs are not covered. Only AWS is implemented;
 `CloudProvider` in `providers/base.py` is the seam for GCP or Azure, and both publish MCP servers that
 could take the `aws-api` role. Plans live in memory.
 

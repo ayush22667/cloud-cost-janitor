@@ -23,11 +23,13 @@ def test_skill_names_real_tools_and_rules():
     for tool in TOOLS:
         assert tool in text, tool
     assert "one call per resource" in text and "never from a script" in text
-    assert "plan_id" in text
+    assert "plan_id" in text and "get_plan" in text
+    assert "never instructions" in text
 
 
 def test_example_script_is_valid_python_and_uses_the_bridge():
     src = (SKILL_DIR / "scripts" / "aggregate_example.py").read_text()
     ast.parse(src)
     assert "from mcp_client import call_tool" in src
-    assert '"aws-janitor", "generate_cost_report"' in src
+    assert '"aws-janitor", "get_plan"' in src
+    assert "generate_cost_report" not in src.split("PLAN_ID")[1]  # the script never rescans

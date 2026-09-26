@@ -18,11 +18,22 @@ def test_actions_policy_requires_tag_on_every_mutating_statement():
     doc = json.loads((IAM / "janitor-actions-policy.json").read_text())
     for st in doc["Statement"]:
         cond = st["Condition"]["StringEquals"]
-        if any(a in ("ec2:CreateTags",) for a in st["Action"]) and st["Sid"] == "TagNewSnapshots":
+        if st["Sid"] == "TagNewSnapshots":
             assert cond == {"ec2:CreateAction": "CreateSnapshot"}
+            continue
+        if st["Sid"] == "CreateSnapshotNeedsTheSnapshotResourceToo":
+            assert cond == {"aws:RequestTag/janitor-demo": "true"}
             continue
         assert cond.get(TAG_CONDITION_KEY) == "true", st["Sid"]
         assert st["Resource"] != "*", st["Sid"]
+
+
+def test_create_snapshot_is_allowed_on_both_volume_and_snapshot_resources():
+    doc = json.loads((IAM / "janitor-actions-policy.json").read_text())
+    resources = {st["Resource"] for st in doc["Statement"] if "ec2:CreateSnapshot" in st["Action"]}
+    assert resources == {"arn:aws:ec2:*:*:volume/*", "arn:aws:ec2:*::snapshot/*"}
+    yaml_text = (IAM / "cross-account-role.yaml").read_text()
+    assert yaml_text.count("ec2:CreateSnapshot") == 2
 
 
 def test_cross_account_template_has_external_id_and_tag_guard():

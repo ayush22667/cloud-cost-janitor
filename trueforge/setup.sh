@@ -48,8 +48,10 @@ done
 
 SKILL_OK=false
 if [ -n "${SKILL_REPO_URL:-}" ]; then
-  say "Registering skill cloud-cost-audit from $SKILL_REPO_URL (${SKILL_REF:-main})"
-  skill_body=$(python3 -c 'import json,os; print(json.dumps({"manifest":{"type":"git","name":"cloud-cost-audit","url":os.environ["SKILL_REPO_URL"],"path":"skills/cloud-cost-audit","ref":os.environ.get("SKILL_REF","main"),"description":"Audit-to-teardown playbook for the aws-janitor MCP server: scan, aggregate in the sandbox, present, confirm, delete one resource per approved call."}}))')
+  SKILL_REF="${SKILL_REF:-v0.1.0}"   # pin to a release tag; TrueForge clones this ref into the sandbox
+  say "Registering skill cloud-cost-audit from $SKILL_REPO_URL ($SKILL_REF)"
+  export SKILL_REF
+  skill_body=$(python3 -c 'import json,os; print(json.dumps({"manifest":{"type":"git","name":"cloud-cost-audit","url":os.environ["SKILL_REPO_URL"],"path":"skills/cloud-cost-audit","ref":os.environ["SKILL_REF"],"description":"Audit-to-teardown playbook for the aws-janitor MCP server: scan, aggregate in the sandbox, present, confirm, delete one resource per approved call."}}))')
   code=$(curl -s -o /tmp/tf_setup_resp.json -w '%{http_code}' -X PUT "$API/settings/skills" -H 'content-type: application/json' -d "$skill_body")
   if [ "$code" = "200" ] || [ "$code" = "201" ]; then SKILL_OK=true; echo "  registered"; else echo "  WARNING: skill registration failed (HTTP $code $(cat /tmp/tf_setup_resp.json)); agent will use inline instructions"; fi
 else

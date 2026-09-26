@@ -43,7 +43,8 @@ for v in $VOLS; do aws_ ec2 delete-volume --volume-id "$v"; echo "  deleted: $v"
 
 if $DELETE_SNAPSHOTS; then
   say "Snapshots created by the janitor"
-  SNAPS=$(aws_ ec2 describe-snapshots --owner-ids self --filters "Name=tag-key,Values=janitor:plan-id" --query 'Snapshots[].SnapshotId')
+  # Only snapshots the janitor took of demo resources: they inherit janitor-demo=true from the volume.
+  SNAPS=$(aws_ ec2 describe-snapshots --owner-ids self --filters "$TAGF" "Name=tag-key,Values=janitor:plan-id" --query 'Snapshots[].SnapshotId')
   for s in $SNAPS; do aws_ ec2 delete-snapshot --snapshot-id "$s"; echo "  deleted: $s"; done
 fi
 

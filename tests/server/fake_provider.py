@@ -46,6 +46,8 @@ class FakeProvider(CloudProvider):
             "arn:lb/empty": LoadBalancer(id="arn:lb/empty", name="empty-alb", provider="aws", region=REGION, tags={"janitor-demo": "true"}, lb_type="application", registered_targets=0, healthy_targets=0),
         }
         self.snapshots: list[tuple[str, dict[str, str]]] = []
+        self.snapshot_states: dict[str, str] = {}
+        self.fail_delete_once = False
         self.tags_written: list[tuple[list[str], dict[str, str]]] = []
         self.deleted: list[str] = []
         self.fail_with: str | None = None
@@ -90,9 +92,19 @@ class FakeProvider(CloudProvider):
         return self.lbs.get(lb_id)
 
     def snapshot_volume(self, region, volume_id, *, description, tags):
-        sid = f"snap-{volume_id}"
+        sid = f"snap-{volume_id}-{len(self.snapshots) + 1}"
         self.snapshots.append((sid, tags))
+        self.snapshot_states[sid] = "pending"
         return sid
+
+    def find_snapshot(self, region, volume_id, plan_id):
+        for sid, tags in reversed(self.snapshots):
+            if tags.get("janitor:source") == volume_id and tags.get("janitor:plan-id") == plan_id:
+                return sid
+        return None
+
+    def snapshot_state(self, region, snapshot_id):
+        return self.snapshot_states.get(snapshot_id)
 
     def tag_resources(self, region, resource_ids, tags):
         self.tags_written.append((resource_ids, tags))
@@ -113,6 +125,9 @@ class FakeProvider(CloudProvider):
         self.instances.pop(instance_id, None)
 
     def delete_volume(self, region, volume_id):
+        if self.fail_delete_once:
+            self.fail_delete_once = False
+            raise ProviderError("AWS RequestLimitExceeded: try again")
         self.deleted.append(volume_id)
         self.volumes.pop(volume_id, None)
 

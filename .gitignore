@@ -24,3 +24,6 @@ wheels/
 
 # OS
 .DS_Store
+
+# Server audit log
+janitor-audit.jsonl

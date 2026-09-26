@@ -19,6 +19,8 @@ _NOT_FOUND_CODES = {
     "InvalidInstanceID.Malformed",
     "InvalidVolume.NotFound",
     "InvalidVolumeID.Malformed",
+    "InvalidSnapshot.NotFound",
+    "InvalidSnapshotID.Malformed",
     "InvalidParameterValue",
 }
 
@@ -156,6 +158,32 @@ def snapshot_volume(clients: AwsClients, region: str, volume_id: str, *, descrip
         TagSpecifications=[{"ResourceType": "snapshot", "Tags": [{"Key": k, "Value": v} for k, v in tags.items()]}],
     )
     return resp["SnapshotId"]
+
+
+def find_snapshot(clients: AwsClients, region: str, volume_id: str, plan_id: str) -> str | None:
+    """An existing pending/completed snapshot the janitor already took of this volume for this plan."""
+    resp = clients.ec2(region).describe_snapshots(
+        OwnerIds=["self"],
+        Filters=[
+            {"Name": "tag:janitor:source", "Values": [volume_id]},
+            {"Name": "tag:janitor:plan-id", "Values": [plan_id]},
+            {"Name": "status", "Values": ["pending", "completed"]},
+        ],
+    )
+    snaps = sorted(resp.get("Snapshots", []), key=lambda s: s.get("StartTime") or 0, reverse=True)
+    return snaps[0]["SnapshotId"] if snaps else None
+
+
+def snapshot_state(clients: AwsClients, region: str, snapshot_id: str) -> str | None:
+    ec2 = clients.ec2(region)
+    try:
+        resp = ec2.describe_snapshots(SnapshotIds=[snapshot_id])
+    except ec2.exceptions.ClientError as e:  # type: ignore[attr-defined]
+        if _is_not_found(e):
+            return None
+        raise
+    snaps = resp.get("Snapshots", [])
+    return snaps[0].get("State") if snaps else None
 
 
 def tag_resources(clients: AwsClients, region: str, resource_ids: list[str], tags: dict[str, str]) -> None:

@@ -3,7 +3,7 @@ import pytest
 from cloud_cost_janitor.config import IDENTITY_HELP, load_settings
 
 ENV_KEYS = (
-    "COST_JANITOR_TOKEN", "AWS_REGIONS", "JANITOR_PORT",
+    "COST_JANITOR_TOKEN", "AWS_REGIONS", "JANITOR_PORT", "JANITOR_AUDIT_LOG",
     "AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_ROLE_ARN", "AWS_EXTERNAL_ID",
 )
 
@@ -94,9 +94,10 @@ def test_defaults(base):
 def test_env_overrides(base, monkeypatch):
     monkeypatch.setenv("AWS_REGIONS", "us-east-1, ap-south-1")
     monkeypatch.setenv("JANITOR_PORT", "8010")
+    monkeypatch.setenv("JANITOR_AUDIT_LOG", "/tmp/janitor-test-audit.jsonl")
     s = load_settings(env_file=None)
     assert s.regions == ("us-east-1", "ap-south-1")
-    assert s.port == 8010
+    assert s.port == 8010 and s.audit_log == "/tmp/janitor-test-audit.jsonl"
 
 
 def test_env_file_is_loaded(tmp_path):

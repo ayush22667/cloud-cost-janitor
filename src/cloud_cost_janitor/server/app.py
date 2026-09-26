@@ -10,6 +10,7 @@ from fastmcp.server.auth.providers.debug import DebugTokenVerifier
 from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.planner import PlanRegistry
 from cloud_cost_janitor.providers.base import CloudProvider
+from cloud_cost_janitor.server.audit import AuditLog
 from cloud_cost_janitor.server.context import ServerContext
 from cloud_cost_janitor.server.tools import plan_tools, scan_tools, spend_tools, teardown_tools
 
@@ -21,7 +22,7 @@ INSTRUCTIONS = (
 )
 
 
-def create_app(settings: Settings, provider: CloudProvider, registry: PlanRegistry | None = None) -> FastMCP:
+def create_app(settings: Settings, provider: CloudProvider, registry: PlanRegistry | None = None, audit: AuditLog | None = None) -> FastMCP:
     expected = settings.token
 
     def validate(token: str) -> bool:
@@ -29,7 +30,7 @@ def create_app(settings: Settings, provider: CloudProvider, registry: PlanRegist
 
     auth = DebugTokenVerifier(validate=validate, client_id="trueforge")
     mcp = FastMCP(name="aws-janitor", instructions=INSTRUCTIONS, auth=auth)
-    ctx = ServerContext(settings=settings, provider=provider, plans=registry or PlanRegistry())
+    ctx = ServerContext(settings=settings, provider=provider, plans=registry or PlanRegistry(), audit=audit)
     scan_tools.register(mcp, ctx)
     plan_tools.register(mcp, ctx)
     teardown_tools.register(mcp, ctx)

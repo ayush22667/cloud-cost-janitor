@@ -20,3 +20,21 @@ def test_window_without_creation_time():
     now = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
     start, _ = window(now, None, lookback_days=7)
     assert start == now - timedelta(days=7)
+
+
+from cloud_cost_janitor.providers.aws.metrics import MAX_DATAPOINTS, clamp_lookback, period_for
+
+
+def test_period_keeps_datapoints_under_the_limit():
+    assert period_for(14) == 3600 and period_for(60) == 3600
+    assert period_for(61) == 7200 and period_for(120) == 7200 and period_for(365) == 3600 * 7
+    for days in (1, 14, 60, 61, 120, 365):
+        assert days * 24 * 3600 / period_for(days) <= MAX_DATAPOINTS
+
+
+def test_lookback_bounds():
+    assert clamp_lookback(1) == 1 and clamp_lookback(365) == 365
+    import pytest
+    for bad in (0, -1, 366, "14"):
+        with pytest.raises(ValueError):
+            clamp_lookback(bad)  # type: ignore[arg-type]

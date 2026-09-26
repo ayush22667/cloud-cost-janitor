@@ -3,6 +3,7 @@ from fastmcp import Client
 
 from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.server.app import create_app
+from cloud_cost_janitor.server.audit import NullAuditLog
 from tests.server.fake_provider import FakeProvider
 
 TOKEN = "test-token"
@@ -19,8 +20,13 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def mcp(settings, fake):
-    return create_app(settings, fake)
+def audit() -> NullAuditLog:
+    return NullAuditLog()
+
+
+@pytest.fixture
+def mcp(settings, fake, audit):
+    return create_app(settings, fake, audit=audit)
 
 
 @pytest.fixture

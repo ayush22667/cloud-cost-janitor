@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastmcp.exceptions import ToolError
 
@@ -101,12 +103,13 @@ async def test_delete_refusals(client, fake):
 async def test_delete_snapshots_then_deletes(client, fake):
     pid = await _plan_id(client)
     res = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
-    assert res == {"resource_id": "vol-a", "deleted": True, "action": "delete_volume", "snapshot_ids": ["snap-vol-a"], "monthly_saving_usd": 0.8}
+    assert res["deleted"] is True and res["action"] == "delete_volume" and res["snapshot_ids"] == ["snap-vol-a-1"] and res["monthly_saving_usd"] == 0.8
+    assert res["snapshots"][0]["state"] == "pending"
     assert fake.deleted == ["vol-a"]
     assert fake.snapshots[0][1]["janitor:source"] == "vol-a" and fake.snapshots[0][1]["janitor:plan-id"] == pid
 
     inst = (await client.call_tool("delete_resource", {"resource_type": "instance", "resource_id": "i-idle", "region": REGION, "plan_id": pid})).data
-    assert inst["deleted"] and inst["snapshot_ids"] == ["snap-vol-root"]
+    assert inst["deleted"] and inst["snapshot_ids"] == ["snap-vol-root-2"]
 
     lb = (await client.call_tool("delete_resource", {"resource_type": "load_balancer", "resource_id": "arn:lb/empty", "region": REGION, "plan_id": pid})).data
     assert lb["deleted"] and lb["snapshot_ids"] == []
@@ -129,5 +132,63 @@ async def test_mark_and_unmark(client, fake):
     blocked = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
     assert blocked["refused"] and "grace period" in blocked["reason"]
 
-    await client.call_tool("unmark_teardown", {"resource_ids": ["vol-a"], "region": REGION})
+    un = (await client.call_tool("unmark_teardown", {"resource_ids": ["vol-a", "vol-zzz"], "region": REGION, "plan_id": pid})).data
+    assert un["unmarked"] == ["vol-a"] and un["skipped_not_in_plan"] == ["vol-zzz"]
     assert "janitor:teardown-after" not in fake.volumes["vol-a"].tags
+    with pytest.raises(ToolError, match="expired"):
+        await client.call_tool("unmark_teardown", {"resource_ids": ["vol-a"], "region": REGION, "plan_id": "stale"})
+    for bad in (0, -3, 91):
+        with pytest.raises(ToolError, match="grace_days"):
+            await client.call_tool("mark_for_teardown", {"resource_ids": ["vol-a"], "region": REGION, "plan_id": pid, "grace_days": bad})
+
+
+async def test_snapshot_reused_on_retry_and_ids_survive_delete_failure(client, fake, audit):
+    pid = await _plan_id(client)
+    fake.fail_delete_once = True
+    first = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
+    assert first["deleted"] is False and "RequestLimitExceeded" in first["error"]
+    assert first["snapshots"][0]["snapshot_id"] == "snap-vol-a-1"  # restore point reported despite the failure
+    assert "vol-a" in fake.volumes
+    second = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
+    assert second["deleted"] is True and second["snapshot_ids"] == ["snap-vol-a-1"]  # reused, not duplicated
+    assert len(fake.snapshots) == 1
+    events = [e["event"] for e in audit.entries]
+    assert events.count("delete.requested") == 2 and "delete.failed" in events and "delete.done" in events
+
+
+async def test_snapshot_inherits_resource_tags(client, fake):
+    pid = await _plan_id(client)
+    await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})
+    tags = fake.snapshots[0][1]
+    assert tags["janitor-demo"] == "true" and tags["janitor:source"] == "vol-a" and tags["janitor:plan-id"] == pid
+
+
+async def test_wait_for_snapshot_blocks_until_completed(client, fake, monkeypatch):
+    pid = await _plan_id(client)
+    import cloud_cost_janitor.server.tools.teardown_tools as tt
+
+    monkeypatch.setattr(tt, "SNAPSHOT_POLL_SECONDS", 0)
+    polls = {"n": 0}
+    real_state = fake.snapshot_state
+
+    def state(region, sid):
+        polls["n"] += 1
+        if polls["n"] >= 3:
+            fake.snapshot_states[sid] = "completed"
+        return real_state(region, sid)
+
+    monkeypatch.setattr(fake, "snapshot_state", state)
+    res = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid, "wait_for_snapshot": True})).data
+    assert res["deleted"] is True and res["snapshots"][0]["state"] == "completed"
+
+
+async def test_lookback_out_of_range_is_rejected(client):
+    with pytest.raises(ToolError, match="lookback_days"):
+        await client.call_tool("generate_cost_report", {"instance_lookback_days": 400})
+
+
+async def test_plan_created_is_audited(client, audit):
+    pid = await _plan_id(client)
+    created = [e for e in audit.entries if e["event"] == "plan.created"]
+    assert created and created[0]["plan_id"] == pid and "i-idle" in created[0]["findings"]
+    assert not any(k in json.dumps(audit.entries, default=str) for k in ("AKIA", "arn:aws:iam", "account_id"))

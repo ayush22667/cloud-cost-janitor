@@ -17,7 +17,7 @@ READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": T
 def _guard(fn):
     try:
         return fn()
-    except ProviderError as e:
+    except (ProviderError, ValueError) as e:  # ValueError: lookback out of range
         raise ToolError(str(e)) from e
 
 

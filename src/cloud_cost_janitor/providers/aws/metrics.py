@@ -12,6 +12,24 @@ from cloud_cost_janitor.models import DailyStat, UtilisationMetrics
 
 PERIOD_SECONDS = 3600
 BOOT_EXCLUSION = timedelta(hours=1)  # ignore the launch-time CPU spike
+MAX_DATAPOINTS = 1440  # GetMetricStatistics hard limit per call
+MAX_LOOKBACK_DAYS = 365  # CloudWatch keeps 1-hour datapoints for 455 days; a year is plenty
+
+
+def period_for(lookback_days: int) -> int:
+    """Smallest multiple of one hour that keeps ``lookback_days`` under the 1,440-datapoint limit.
+
+    <= 60 days -> 3600 s, <= 120 days -> 7200 s, and so on. Daily folding is unaffected.
+    """
+    hours = max(1, lookback_days) * 24
+    return PERIOD_SECONDS * max(1, -(-hours // MAX_DATAPOINTS))
+
+
+def clamp_lookback(days: int) -> int:
+    """Lookback windows must be 1..MAX_LOOKBACK_DAYS."""
+    if not isinstance(days, int) or days < 1 or days > MAX_LOOKBACK_DAYS:
+        raise ValueError(f"lookback_days must be between 1 and {MAX_LOOKBACK_DAYS}")
+    return days
 
 
 def window(now: datetime, created_at: datetime | None, lookback_days: int) -> tuple[datetime, datetime]:
@@ -22,7 +40,7 @@ def window(now: datetime, created_at: datetime | None, lookback_days: int) -> tu
     return start, now
 
 
-def _stats(cw, namespace: str, metric: str, dims: list[dict], start: datetime, end: datetime, statistics: list[str]):
+def _stats(cw, namespace: str, metric: str, dims: list[dict], start: datetime, end: datetime, statistics: list[str], period: int = PERIOD_SECONDS):
     if end <= start:
         return []
     resp = cw.get_metric_statistics(
@@ -31,18 +49,20 @@ def _stats(cw, namespace: str, metric: str, dims: list[dict], start: datetime, e
         Dimensions=dims,
         StartTime=start,
         EndTime=end,
-        Period=PERIOD_SECONDS,
+        Period=period,
         Statistics=statistics,
     )
     return sorted(resp.get("Datapoints", []), key=lambda d: d["Timestamp"])
 
 
 def instance_metrics(cw, instance_id: str, *, now: datetime, launched_at: datetime | None, lookback_days: int) -> UtilisationMetrics:
+    lookback_days = clamp_lookback(lookback_days)
     start, end = window(now, launched_at, lookback_days)
+    period = period_for(lookback_days)
     dims = [{"Name": "InstanceId", "Value": instance_id}]
-    cpu = _stats(cw, "AWS/EC2", "CPUUtilization", dims, start, end, ["Average", "Maximum"])
-    net_in = _stats(cw, "AWS/EC2", "NetworkIn", dims, start, end, ["Sum"])
-    net_out = _stats(cw, "AWS/EC2", "NetworkOut", dims, start, end, ["Sum"])
+    cpu = _stats(cw, "AWS/EC2", "CPUUtilization", dims, start, end, ["Average", "Maximum"], period)
+    net_in = _stats(cw, "AWS/EC2", "NetworkIn", dims, start, end, ["Sum"], period)
+    net_out = _stats(cw, "AWS/EC2", "NetworkOut", dims, start, end, ["Sum"], period)
 
     by_day: dict[date, dict] = defaultdict(lambda: {"avg": [], "max": [], "net": 0, "has_net": False})
     for p in cpu:
@@ -64,14 +84,15 @@ def instance_metrics(cw, instance_id: str, *, now: datetime, launched_at: dateti
         for day, v in sorted(by_day.items())
         if v["avg"]  # a day counts only if we have CPU data for it
     ]
-    return UtilisationMetrics(lookback_days=lookback_days, observed_hours=float(len(cpu)), days=days)
+    return UtilisationMetrics(lookback_days=lookback_days, observed_hours=float(len(cpu) * period / 3600), days=days)
 
 
 def load_balancer_metrics(cw, lb_dimension: str, *, now: datetime, created_at: datetime | None, lookback_days: int) -> UtilisationMetrics:
     """Daily RequestCount for an Application Load Balancer (namespace AWS/ApplicationELB)."""
+    lookback_days = clamp_lookback(lookback_days)
     start, end = window(now, created_at, lookback_days)
     dims = [{"Name": "LoadBalancer", "Value": lb_dimension}]
-    points = _stats(cw, "AWS/ApplicationELB", "RequestCount", dims, start, end, ["Sum"])
+    points = _stats(cw, "AWS/ApplicationELB", "RequestCount", dims, start, end, ["Sum"], period_for(lookback_days))
 
     by_day: dict[date, int] = defaultdict(int)
     for p in points:
