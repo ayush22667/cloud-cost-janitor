@@ -48,7 +48,6 @@ async def test_provider_error_becomes_tool_error(client, fake):
 async def test_generate_cost_report_builds_plan(client):
     report = (await client.call_tool("generate_cost_report", {})).data
     plan = report["plan"]
-    assert report["dry_run_mode"] is True
     assert plan["regions"] == [REGION] and len(plan["plan_id"]) == 12
     assert len(plan["findings"]) == 6 and plan["protected_count"] == 1
     ids = [f["resource_id"] for f in plan["findings"]]
@@ -65,14 +64,6 @@ async def _plan_id(client) -> str:
     return (await client.call_tool("generate_cost_report", {})).data["plan"]["plan_id"]
 
 
-async def test_delete_is_dry_run_by_default(client, fake):
-    pid = await _plan_id(client)
-    res = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
-    assert res["dry_run"] is True and res["deleted"] is False
-    assert res["would_do"] == ["snapshot vol-a", "delete_volume vol-a"]
-    assert fake.deleted == [] and fake.snapshots == []
-
-
 async def test_delete_refusals(client, fake):
     pid = await _plan_id(client)
     call = lambda **kw: client.call_tool("delete_resource", {"region": REGION, "plan_id": pid, **kw})
@@ -86,9 +77,6 @@ async def test_delete_refusals(client, fake):
     protected = (await call(resource_type="instance", resource_id="i-prod")).data
     assert protected["refused"] and "protected" in protected["reason"]
 
-    untagged = (await call(resource_type="volume", resource_id="vol-untagged")).data
-    assert untagged["refused"] and "DELETE_ONLY_TAGGED" in untagged["reason"]
-
     wrong_type = (await call(resource_type="instance", resource_id="vol-a")).data
     assert wrong_type["refused"]
 
@@ -98,32 +86,39 @@ async def test_delete_refusals(client, fake):
     fake.volumes["vol-b"].state, fake.volumes["vol-b"].attached_instance_id = "in-use", "i-idle"
     attached = (await call(resource_type="volume", resource_id="vol-b")).data
     assert attached["refused"] and "attached to i-idle" in attached["reason"]
-    assert fake.deleted == []
+    assert fake.deleted == [] and fake.snapshots == []
 
 
-async def test_live_delete_snapshots_then_deletes(live_client, fake):
-    pid = await _plan_id(live_client)
-    res = (await live_client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
-    assert res == {"resource_id": "vol-a", "deleted": True, "dry_run": False, "action": "delete_volume", "snapshot_ids": ["snap-vol-a"], "monthly_saving_usd": 0.8}
+async def test_delete_snapshots_then_deletes(client, fake):
+    pid = await _plan_id(client)
+    res = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
+    assert res == {"resource_id": "vol-a", "deleted": True, "action": "delete_volume", "snapshot_ids": ["snap-vol-a"], "monthly_saving_usd": 0.8}
     assert fake.deleted == ["vol-a"]
     assert fake.snapshots[0][1]["janitor:source"] == "vol-a" and fake.snapshots[0][1]["janitor:plan-id"] == pid
 
-    inst = (await live_client.call_tool("delete_resource", {"resource_type": "instance", "resource_id": "i-idle", "region": REGION, "plan_id": pid})).data
+    inst = (await client.call_tool("delete_resource", {"resource_type": "instance", "resource_id": "i-idle", "region": REGION, "plan_id": pid})).data
     assert inst["deleted"] and inst["snapshot_ids"] == ["snap-vol-root"]
 
-    lb = (await live_client.call_tool("delete_resource", {"resource_type": "load_balancer", "resource_id": "arn:lb/empty", "region": REGION, "plan_id": pid})).data
+    lb = (await client.call_tool("delete_resource", {"resource_type": "load_balancer", "resource_id": "arn:lb/empty", "region": REGION, "plan_id": pid})).data
     assert lb["deleted"] and lb["snapshot_ids"] == []
     assert fake.deleted == ["vol-a", "i-idle", "arn:lb/empty"]
 
 
-async def test_mark_and_unmark(live_client, fake):
-    pid = await _plan_id(live_client)
-    res = (await live_client.call_tool("mark_for_teardown", {"resource_ids": ["vol-a", "vol-zzz"], "region": REGION, "plan_id": pid, "grace_days": 7})).data
+async def test_untagged_volume_is_deletable_by_the_server(client, fake):
+    """Restricting *which* resources may be deleted is IAM's job (iam/), not a server-side allowlist."""
+    pid = await _plan_id(client)
+    res = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-untagged", "region": REGION, "plan_id": pid})).data
+    assert res["deleted"] is True and fake.deleted == ["vol-untagged"]
+
+
+async def test_mark_and_unmark(client, fake):
+    pid = await _plan_id(client)
+    res = (await client.call_tool("mark_for_teardown", {"resource_ids": ["vol-a", "vol-zzz"], "region": REGION, "plan_id": pid, "grace_days": 7})).data
     assert res["marked"] == ["vol-a"] and res["skipped_not_in_plan"] == ["vol-zzz"]
     assert fake.volumes["vol-a"].tags["janitor:teardown-after"] == res["teardown_after"]
 
-    blocked = (await live_client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
+    blocked = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-a", "region": REGION, "plan_id": pid})).data
     assert blocked["refused"] and "grace period" in blocked["reason"]
 
-    await live_client.call_tool("unmark_teardown", {"resource_ids": ["vol-a"], "region": REGION})
+    await client.call_tool("unmark_teardown", {"resource_ids": ["vol-a"], "region": REGION})
     assert "janitor:teardown-after" not in fake.volumes["vol-a"].tags

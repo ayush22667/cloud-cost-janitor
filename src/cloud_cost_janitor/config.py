@@ -26,19 +26,6 @@ IDENTITY_HELP = (
 )
 
 
-def _truthy(value: str | None) -> bool:
-    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _parse_tag(value: str | None) -> tuple[str, str] | None:
-    """'key=value' -> ('key', 'value'); empty/None -> None."""
-    if not value or "=" not in value:
-        return None
-    key, _, val = value.partition("=")
-    key, val = key.strip(), val.strip()
-    return (key, val) if key and val else None
-
-
 def _env(name: str) -> str | None:
     value = os.environ.get(name, "").strip()
     return value or None
@@ -48,8 +35,6 @@ def _env(name: str) -> str | None:
 class Settings:
     token: str = field(repr=False)
     regions: tuple[str, ...] = ("us-east-1",)
-    allow_delete: bool = False
-    delete_only_tag: tuple[str, str] | None = ("janitor-demo", "true")
     protected_tags: tuple[tuple[str, str], ...] = DEFAULT_PROTECTED_TAGS
     host: str = "127.0.0.1"
     port: int = 8000
@@ -64,10 +49,6 @@ class Settings:
     aws_session_token: str | None = field(default=None, repr=False)
     aws_role_arn: str | None = None  # audit another account by assuming a role there (no keys stored)
     aws_external_id: str | None = field(default=None, repr=False)
-
-    @property
-    def dry_run(self) -> bool:
-        return not self.allow_delete
 
 
 def _validate_identity(s: Settings) -> None:
@@ -99,14 +80,10 @@ def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
         raise ValueError("COST_JANITOR_TOKEN is not set (see .env.example)")
 
     regions = tuple(r.strip() for r in os.environ.get("AWS_REGIONS", "us-east-1").split(",") if r.strip())
-    delete_only_raw = os.environ.get("DELETE_ONLY_TAGGED")
-    delete_only_tag = _parse_tag(delete_only_raw) if delete_only_raw is not None else ("janitor-demo", "true")
 
     settings = Settings(
         token=token,
         regions=regions or ("us-east-1",),
-        allow_delete=_truthy(os.environ.get("ALLOW_DELETE")),
-        delete_only_tag=delete_only_tag,
         host=os.environ.get("JANITOR_HOST", "127.0.0.1"),
         port=int(os.environ.get("JANITOR_PORT", "8000")),
         provider=os.environ.get("CLOUD_PROVIDER", "aws").lower(),

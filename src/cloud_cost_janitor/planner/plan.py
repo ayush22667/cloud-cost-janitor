@@ -125,6 +125,7 @@ def refusal_reason(finding: Finding, fresh: Resource | None, settings: Settings,
 
     Called immediately before acting, with a freshly described resource, so that anything that changed
     since the plan was built (attachment, traffic, a protect tag, a grace period) blocks the delete.
+    Which resources may be deleted at all is enforced by IAM (see iam/), not by a server-side allowlist.
     """
     today = today or _utcnow().date()
     if fresh is None:
@@ -133,11 +134,6 @@ def refusal_reason(finding: Finding, fresh: Resource | None, settings: Settings,
     prot = protection_reason(fresh.tags, settings.protected_tags)
     if prot:
         return f"protected by {prot}"
-
-    if settings.delete_only_tag:
-        key, value = settings.delete_only_tag
-        if fresh.tags.get(key) != value:
-            return f"DELETE_ONLY_TAGGED guard: resource lacks tag {key}={value}"
 
     marked = fresh.tags.get(TEARDOWN_AFTER_TAG)
     if marked:

@@ -45,6 +45,6 @@ def test_startup_line_has_no_identity(monkeypatch, capsys):
     with pytest.raises(StopServe):
         entry.main()
     err = capsys.readouterr().err
-    assert "mode=dry-run" in err and "regions=us-east-1" in err
+    assert "regions=us-east-1" in err and "8000/mcp" in err
     for forbidden in ("ops-profile", "123456789012", "arn:", "account", "AKIA"):
         assert forbidden not in err, forbidden

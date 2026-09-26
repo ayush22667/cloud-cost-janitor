@@ -15,8 +15,8 @@ class ProviderError(RuntimeError):
 class CloudProvider(ABC):
     """Read resources with utilisation metrics; perform the few write actions the janitor needs.
 
-    Write methods perform the real operation. Deciding *whether* to call them (dry-run, approval,
-    protection, tag guard) is the planner's and server's job, not the provider's.
+    Write methods perform the real operation. Deciding *whether* to call them (approval, protection,
+    re-verification) is the planner's and server's job, not the provider's.
     """
 
     @property

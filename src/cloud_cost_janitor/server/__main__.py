@@ -27,11 +27,9 @@ def main() -> None:
         print(f"cloud-cost-janitor: AWS credentials rejected: {e}", file=sys.stderr)
         sys.exit(2)
 
-    mode = "LIVE (ALLOW_DELETE=true)" if settings.allow_delete else "dry-run"
-    guard = f"{settings.delete_only_tag[0]}={settings.delete_only_tag[1]}" if settings.delete_only_tag else "off"
     print(
         f"cloud-cost-janitor: provider={provider.name} regions={','.join(settings.regions)} "
-        f"mode={mode} delete_only_tag={guard} -> http://{settings.host}:{settings.port}/mcp",
+        f"-> http://{settings.host}:{settings.port}/mcp",
         file=sys.stderr,
     )
     create_app(settings, provider).run(transport="http", host=settings.host, port=settings.port)

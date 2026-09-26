@@ -3,7 +3,7 @@ import pytest
 from cloud_cost_janitor.config import IDENTITY_HELP, load_settings
 
 ENV_KEYS = (
-    "COST_JANITOR_TOKEN", "AWS_REGIONS", "ALLOW_DELETE", "DELETE_ONLY_TAGGED", "JANITOR_PORT",
+    "COST_JANITOR_TOKEN", "AWS_REGIONS", "JANITOR_PORT",
     "AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_ROLE_ARN", "AWS_EXTERNAL_ID",
 )
 
@@ -84,10 +84,8 @@ def test_secrets_never_appear_in_repr(monkeypatch):
         assert secret not in text
 
 
-def test_safe_defaults(base):
+def test_defaults(base):
     s = load_settings(env_file=None)
-    assert s.allow_delete is False and s.dry_run is True
-    assert s.delete_only_tag == ("janitor-demo", "true")
     assert s.regions == ("us-east-1",)
     assert s.port == 8000
     assert ("janitor:keep", "true") in s.protected_tags
@@ -95,26 +93,17 @@ def test_safe_defaults(base):
 
 def test_env_overrides(base, monkeypatch):
     monkeypatch.setenv("AWS_REGIONS", "us-east-1, ap-south-1")
-    monkeypatch.setenv("ALLOW_DELETE", "true")
-    monkeypatch.setenv("DELETE_ONLY_TAGGED", "team=platform")
     monkeypatch.setenv("JANITOR_PORT", "8010")
     s = load_settings(env_file=None)
     assert s.regions == ("us-east-1", "ap-south-1")
-    assert s.allow_delete is True and s.dry_run is False
-    assert s.delete_only_tag == ("team", "platform")
     assert s.port == 8010
-
-
-def test_empty_delete_only_tag_disables_guard(base, monkeypatch):
-    monkeypatch.setenv("DELETE_ONLY_TAGGED", "")
-    assert load_settings(env_file=None).delete_only_tag is None
 
 
 def test_env_file_is_loaded(tmp_path):
     env = tmp_path / ".env"
-    env.write_text("COST_JANITOR_TOKEN=from-file\nAWS_PROFILE=janitor\nALLOW_DELETE=yes\n")
+    env.write_text("COST_JANITOR_TOKEN=from-file\nAWS_PROFILE=janitor\nAWS_REGIONS=eu-west-1\n")
     s = load_settings(env_file=env)
-    assert s.token == "from-file" and s.aws_profile == "janitor" and s.allow_delete is True
+    assert s.token == "from-file" and s.aws_profile == "janitor" and s.regions == ("eu-west-1",)
 
 
 def test_help_text_names_both_options():

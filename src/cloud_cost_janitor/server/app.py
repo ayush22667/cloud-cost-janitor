@@ -16,8 +16,8 @@ from cloud_cost_janitor.server.tools import plan_tools, scan_tools, teardown_too
 INSTRUCTIONS = (
     "Cloud Cost Janitor: finds idle instances, orphaned volumes and idle load balancers, prices them, and tears "
     "them down safely. Start with generate_cost_report to get findings and a plan_id. delete_resource is the only "
-    "destructive tool: it requires a live plan_id, re-verifies the resource, snapshots stateful data first, and is a "
-    "dry run unless the server was started with ALLOW_DELETE=true."
+    "destructive tool: it requires a live plan_id, re-verifies the resource and snapshots stateful data first. "
+    "It runs only after the user approves the call."
 )
 
 

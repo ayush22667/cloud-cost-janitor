@@ -112,16 +112,11 @@ def vol(**kw) -> Volume:
     return Volume(**base)
 
 
-def test_refuses_when_gone_protected_or_untagged():
+def test_refuses_when_gone_or_protected():
     f = finding("vol-1", ResourceType.VOLUME, TeardownAction.DELETE_VOLUME, 0.8)
     assert refusal_reason(f, None, S, today=TODAY) == "resource no longer exists"
     assert "protected" in refusal_reason(f, vol(tags={"janitor-demo": "true", "env": "prod"}), S, today=TODAY)
-    assert "DELETE_ONLY_TAGGED" in refusal_reason(f, vol(tags={}), S, today=TODAY)
-
-
-def test_guard_can_be_disabled():
-    f = finding("vol-1", ResourceType.VOLUME, TeardownAction.DELETE_VOLUME, 0.8)
-    assert refusal_reason(f, vol(tags={}), Settings(token="t", delete_only_tag=None), today=TODAY) is None
+    assert refusal_reason(f, vol(tags={}), S, today=TODAY) is None  # no server-side tag allowlist; IAM decides
 
 
 def test_refuses_volume_that_got_attached():

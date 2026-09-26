@@ -65,7 +65,7 @@ flowchart LR
 3. Optional two-phase mode (Cloud Custodian's *mark-for-op*): `mark_for_teardown` tags resources `janitor:teardown-after=<date>`; deletion only allowed after that date. Reversible (untag) and not approval-gated. Default off for the demo, on in the README as the production mode.
 4. `plan_id` (in-memory, 1 h TTL) must be presented to `delete_resource`; the server **re-describes the resource at delete time** and refuses if it is now attached / has healthy targets / gained a protect tag.
 
-**Server safety flags (env):** `ALLOW_DELETE` (default `false` → dry-run; result always carries `dry_run`), `DELETE_ONLY_TAGGED=janitor-demo=true` (demo guard), `COST_JANITOR_TOKEN` (bearer), `AWS_REGIONS` (default `us-east-1`).
+**Server env:** `COST_JANITOR_TOKEN` (bearer), the AWS identity (`AWS_PROFILE` or key pair, optional `AWS_ROLE_ARN`), `AWS_REGIONS` (default `us-east-1`). *(A dry-run switch and a server-side tag allowlist existed during the build and were removed: approval is TrueForge's job, and which resources may be deleted is IAM's — see `iam/`.)*
 
 **MCP tools (aws-janitor):**
 
@@ -77,7 +77,7 @@ flowchart LR
 | `find_idle_load_balancers(region, lookback_days=7)` | read-only | LBs with no healthy targets / no traffic |
 | `generate_cost_report(regions?)` | read-only | full scan → `TeardownPlan` JSON with `plan_id`, totals, protected count |
 | `mark_for_teardown(resource_ids, plan_id)` | write, reversible | tag resources (two-phase mode) |
-| `delete_resource(resource_type, resource_id, region, plan_id)` | **destructive** | snapshot → re-verify → delete; dry-run unless `ALLOW_DELETE=true` |
+| `delete_resource(resource_type, resource_id, region, plan_id)` | **destructive** | re-verify → snapshot → delete; reaches the server only after the user's Allow |
 
 **Official AWS server (aws-api):** `uvx awslabs.aws-api-mcp-server@latest` with `AWS_API_MCP_TRANSPORT=streamable-http`, `AWS_API_MCP_PORT=8001`, `READ_OPERATIONS_ONLY=true`, `AUTH_TYPE=no-auth` (loopback only). Attached to the agent with `enable_tools: ["call_aws","suggest_aws_commands"]` and `require_approval_for_tools: ["@all"]` (its single `call_aws` tool is unannotated, so gate everything).
 
@@ -97,7 +97,7 @@ cloud-cost-janitor/
 │   ├── AGENTS.md
 │   ├── models.py             # dataclasses, provider-agnostic
 │   ├── pricing.py            # static list prices (us-east-1), estimate helpers
-│   ├── config.py             # env flags (ALLOW_DELETE, DELETE_ONLY_TAGGED, token, regions)
+│   ├── config.py             # env settings (token, regions, AWS identity)
 │   ├── providers/
 │   │   ├── AGENTS.md
 │   │   ├── base.py           # CloudProvider ABC

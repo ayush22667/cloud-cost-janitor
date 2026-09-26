@@ -55,7 +55,6 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
         return {
             "summary": _summary(plan),
             "scanned": scanned,
-            "dry_run_mode": ctx.settings.dry_run,
             "plan": plan.to_dict(),
         }
 

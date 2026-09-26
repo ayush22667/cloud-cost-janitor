@@ -15,12 +15,7 @@ def fake() -> FakeProvider:
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(token=TOKEN)  # dry-run, demo tag guard on
-
-
-@pytest.fixture
-def live_settings() -> Settings:
-    return Settings(token=TOKEN, allow_delete=True)
+    return Settings(token=TOKEN, aws_profile="test")
 
 
 @pytest.fixture
@@ -29,17 +24,6 @@ def mcp(settings, fake):
 
 
 @pytest.fixture
-def live_mcp(live_settings, fake):
-    return create_app(live_settings, fake)
-
-
-@pytest.fixture
 async def client(mcp):
     async with Client(transport=mcp) as c:
-        yield c
-
-
-@pytest.fixture
-async def live_client(live_mcp):
-    async with Client(transport=live_mcp) as c:
         yield c

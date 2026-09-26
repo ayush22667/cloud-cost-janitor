@@ -12,7 +12,7 @@ you present must come from code you ran, not from mental arithmetic.
 ## 1. Scan and plan
 
 Call `generate_cost_report` (optionally with `regions`, `instance_lookback_days`, `lb_lookback_days`).
-It returns `summary`, `scanned`, `dry_run_mode` and `plan` with a `plan_id` valid for one hour.
+It returns `summary`, `scanned` and `plan` with a `plan_id` valid for one hour.
 Keep the `plan_id`; every teardown call needs it.
 
 ## 2. Aggregate in the sandbox (Code Mode)
@@ -33,7 +33,7 @@ file in the current working directory (a relative path), then run it with `pytho
 Show a table with: resource name/id, type, region, evidence (with confidence), estimated USD/month,
 protected (with the reason). Use a Generative UI table when there are three or more rows, otherwise
 markdown. Then the headline line. State that costs are on-demand list-price estimates and repeat any
-`cost_note` caveats briefly. If `dry_run_mode` is true, say that deletions will be simulated.
+`cost_note` caveats briefly.
 
 Call out protected resources explicitly as *not deletable* and never propose them for teardown.
 
@@ -51,8 +51,8 @@ user's Allow or Deny. Then report per resource:
 | Response | What it means | What to say |
 |---|---|---|
 | `deleted: true` | removed; `snapshot_ids` are restore points | deleted, snapshot id, monthly saving |
-| `dry_run: true` | server not in live mode; nothing changed | simulated only; `would_do` steps; how to enable live mode (`ALLOW_DELETE=true`) |
-| `refused: true` | server safety check blocked it (stale plan, protected, tag guard, grace period, state changed) | the `reason`; if the plan expired, re-run `generate_cost_report` and ask again — the new plan needs a fresh approval |
+| `refused: true` | server safety check blocked it (stale plan, protected, grace period, state changed) | the `reason`; if the plan expired, re-run `generate_cost_report` and ask again — the new plan needs a fresh approval |
+| tool error mentioning `AccessDenied` / `UnauthorizedOperation` | the identity's IAM policy does not allow deleting that resource | say IAM refused it; nothing was changed |
 | tool error "User denied tool call" | the user clicked Deny | not deleted, nothing snapshotted; do not retry unless asked |
 
 Never try to work around a refusal or a denial. If a resource is not in the current plan, regenerate the

@@ -51,7 +51,7 @@ dataclasses in `models.py`.
 src/cloud_cost_janitor/
 ├── models.py      resources, metrics, findings, plans (JSON-serialisable)
 ├── pricing.py     static on-demand list prices (us-east-1) → monthly estimates
-├── config.py      env settings: token, regions, ALLOW_DELETE, DELETE_ONLY_TAGGED
+├── config.py      env settings: token, regions, AWS identity (profile / key pair / role)
 ├── providers/     CloudProvider interface · aws/ (EC2, EBS, ELBv2, CloudWatch)
 ├── rules/         pure detection rules with Trusted Advisor thresholds
 ├── planner/       ordered teardown plan, snapshot-first steps, plan_id registry, re-verification
@@ -78,11 +78,11 @@ Every directory has an `AGENTS.md` describing its rules (with a `CLAUDE.md` that
 
 The approval gate is necessary but not sufficient, so the server defends itself too:
 
-1. **Dry-run by default.** `ALLOW_DELETE` must be `true` or `delete_resource` only reports what it *would* do (`"dry_run": true`).
+1. **Human approval per call.** TrueForge pauses every `delete_resource` call for Allow / Deny; the server only ever sees approved calls.
 2. **Plan required.** Deletion needs a `plan_id` from `generate_cost_report`; plans expire after one hour and a server restart forgets them. A stale plan is refused with "run generate_cost_report again".
 3. **Re-verification at delete time.** The resource is described again and refused if it is now attached, running, has healthy targets, gained a protect tag, or no longer exists.
 4. **Protected tags.** `env=prod`, `Environment=Production`, `janitor:keep=true` are reported but never planned.
-5. **Tag guard.** `DELETE_ONLY_TAGGED=janitor-demo=true` restricts deletion to resources carrying that tag — recommended for demos.
+5. **IAM decides what may be deleted at all.** The identity's policy (`iam/janitor-actions-policy.json`) only allows deleting resources carrying the allowed tag; the server has no allowlist of its own to misconfigure.
 6. **Reversible first step.** Volumes (and an instance's volumes) are snapshotted before deletion; snapshot ids are returned.
 7. **Optional two-phase mode.** `mark_for_teardown` tags resources with `janitor:teardown-after=<date>`; `delete_resource` refuses them until then (Cloud Custodian's *mark-for-op* pattern).
 8. **One resource per call, never from a script.** The agent is instructed to call `delete_resource` directly so every deletion is an individual approval.
@@ -154,9 +154,9 @@ prefer temporary credentials.
 
 `iam/janitor-read-policy.json` grants only the `Describe*`/CloudWatch calls the audit needs.
 `iam/janitor-actions-policy.json` grants snapshot/tag/delete **only on resources tagged
-`janitor-demo=true`** (`aws:ResourceTag` condition). Attach both to the janitor's IAM user or role: then even
-if the server's own tag guard were bypassed, AWS itself refuses to touch an untagged resource. Change the
-tag in the policy and in `DELETE_ONLY_TAGGED` for real use.
+`janitor-demo=true`** (`aws:ResourceTag` condition). Attach both to the janitor's IAM user or role: AWS itself
+refuses to touch an untagged resource, whatever the agent asks. Change the tag in the policy for real use
+(for example `cost-center` or `owner` tags of teams that opted in).
 
 ### Auditing another account (no keys exchanged)
 
@@ -177,7 +177,7 @@ revokes access. (The official `aws-api` server runs as the base identity, not th
 
 ```bash
 scripts/seed_demo.sh                       # ~$0.04/h: idle t3.micro, 2 unattached volumes, empty ALB (all tagged janitor-demo=true)
-ALLOW_DELETE=true scripts/run_mcp_servers.sh   # live mode, still limited to tagged resources
+scripts/run_mcp_servers.sh                 # deletions happen for real after Allow; IAM limits them to tagged resources
 ```
 
 In the chat: *"Audit us-east-1 for wasted cloud spend."* → plan table → pick *Both volumes* →
