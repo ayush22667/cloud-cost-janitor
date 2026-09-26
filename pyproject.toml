@@ -1,0 +1,34 @@
+[project]
+name = "cloud-cost-janitor"
+version = "0.1.0"
+description = "Agent that finds idle cloud resources, prices the waste, and tears them down only after human approval (TrueForge + MCP)."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Ayush Anand" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.43.103",
+    "fastmcp>=4.0.10",
+]
+
+[project.scripts]
+cloud-cost-janitor = "cloud_cost_janitor.server.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11.24,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "moto[cloudwatch,ec2,elbv2]>=5.2.3",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]

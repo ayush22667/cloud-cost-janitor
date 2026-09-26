@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv
+
+# Secrets and local config — never commit
+.env
+.env.*
+!.env.example
+
+# Tool state / session logs
+.omc/
+.claude/
+.playwright-mcp/
+*.log
+
+# OS
+.DS_Store
