@@ -25,8 +25,9 @@ setup script. `scripts/` holds demo/ops shell scripts.
   in `.env` (`AWS_PROFILE` or a key pair; optional `AWS_ROLE_ARN`) — never call `boto3.Session()` without
   arguments and never fall back to the host's default credentials. Never log or print identity or
   credentials (no account id, principal, key id), and keep account ids out of docs. AWS error messages are
-  redacted before they reach the model or the audit log: an IAM denial becomes `"IAM denied <operation> on
-  <resource>"`, and any ARN or account id in another AWS message is stripped.
+  redacted before they reach the model or the audit log: an IAM denial becomes `"AWS <Code>: IAM denied
+  <Operation>"` (e.g. `"AWS UnauthorizedOperation: IAM denied DeleteVolume"`), and any other AWS message
+  has ARNs replaced by `<arn>` and 12-digit account ids by `<account>`.
 - Least privilege is the operator's IAM policy on the identity, not a server-side allowlist; the repo ships none.
 - Every MCP tool declares `title`, `readOnlyHint`, `destructiveHint`.
 - Type hints everywhere; docstrings on tools are the text the model sees — keep them precise and short.

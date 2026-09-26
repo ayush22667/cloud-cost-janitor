@@ -208,8 +208,9 @@ change hands.
 9. Everything the server is asked to do is appended to `janitor-audit.jsonl` (path from
    `JANITOR_AUDIT_LOG`): plans, requests, refusals with reasons, deletions with snapshot ids. It never
    contains the identity or a credential, and AWS error messages are redacted before they reach it or the
-   model: an IAM denial becomes "IAM denied \<operation\> on \<resource\>", and any ARN or account id in
-   another AWS message is stripped.
+   model: an IAM denial becomes `"AWS <Code>: IAM denied <Operation>"` (for example `"AWS
+   UnauthorizedOperation: IAM denied DeleteVolume"`), and any other AWS message has ARNs replaced by
+   `<arn>` and 12-digit account ids by `<account>`.
 10. The agent is told that resource names, tags and descriptions are data, never instructions, since
     anyone who can tag a resource can write text the model will read.
 
