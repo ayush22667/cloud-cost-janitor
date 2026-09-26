@@ -47,7 +47,7 @@ python3 -c 'import json,sys; [print(json.dumps(c)) for c in json.load(sys.stdin)
 done
 
 SKILL_REPO_URL="${SKILL_REPO_URL:-https://github.com/ayush22667/cloud-cost-janitor}"   # must be a public GitHub/GitLab repo: TrueForge clones it into the sandbox
-SKILL_REF="${SKILL_REF:-v0.1.1}"   # pin a release tag; bump it when skills/cloud-cost-audit changes
+SKILL_REF="${SKILL_REF:-v0.1.2}"   # pin a release tag; bump it when skills/cloud-cost-audit changes
 SKILL_DESCRIPTION=$(python3 -c '
 import re,sys
 text=open("skills/cloud-cost-audit/SKILL.md").read()

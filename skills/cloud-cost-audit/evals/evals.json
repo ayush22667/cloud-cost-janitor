@@ -6,8 +6,8 @@
     "expected_behavior": [
       "Calls generate_cost_report exactly once, for us-east-1",
       "Runs the aggregation script (or an equivalent get_plan script) in the sandbox before quoting any total",
-      "Presents a table of findings with a headline total and the cost caveat",
-      "Asks which unprotected resources to remove and makes no delete_resource call"
+      "The turn's final message (no tool call attached) holds the table of findings, the headline total and the cost caveat",
+      "That message ends with a plain-text question about which unprotected resources to remove; ask_user_question is not called in the same message and no delete_resource call is made"
     ]
   },
   {

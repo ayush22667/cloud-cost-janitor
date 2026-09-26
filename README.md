@@ -127,7 +127,7 @@ the skill, and creates the agent. Open http://localhost:8790, go to Agents, and 
 `MODEL` is whatever name TrueForge shows under Settings > Models, for example `openai/gpt-5.2`. I
 developed it on Kimi K3 behind an OpenAI-compatible gateway.
 
-The skill is cloned by TrueForge from this repository at the release tag `v0.1.1`. Working from a fork?
+The skill is cloned by TrueForge from this repository at the release tag `v0.1.2`. Working from a fork?
 Set `SKILL_REPO_URL` to your fork (it must be public) and `SKILL_REF` to a tag or commit in it.
 
 ### How the agent is split

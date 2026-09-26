@@ -5,7 +5,7 @@ license: MIT
 compatibility: Needs the aws-janitor MCP server attached to a TrueForge agent with the sandbox enabled. The read-only aws-api server is optional.
 metadata:
   author: ayush22667
-  version: "0.2.0"
+  version: "0.2.1"
 ---
 
 # Cloud cost audit and teardown
@@ -25,8 +25,8 @@ Copy this into your working notes and tick items off as you go:
 Audit progress:
 - [ ] 1. generate_cost_report once; keep the plan_id
 - [ ] 2. aggregate the plan in the sandbox (scripts/aggregate_plan.py)
-- [ ] 3. present the plan: table, headline, caveats
-- [ ] 4. ask which unprotected resources to remove
+- [ ] 3. present the plan as the final message of the turn: table, headline, caveats
+- [ ] 4. end that same message with the question of what to remove (no tool call with it)
 - [ ] 5. delete_resource once per named resource, directly; report each result
 - [ ] 6. real spend next to the estimate (when asked, or when the account is not a demo)
 ```
@@ -64,10 +64,16 @@ caveat briefly (it names the price source).
 
 Call out protected resources explicitly as *not deletable* and never propose them for teardown.
 
+The plan must be the final message of the turn, with no tool call attached to it. Text sent together
+with a tool call (including `ask_user_question`) is shown only as a collapsed step, not as your reply,
+so the user would never see the plan.
+
 ## 4. Ask what to tear down
 
-Ask which unprotected resources to remove. Use a structured question when the choice is not obvious and
-offer sensible groupings (all, by type, nothing). Never treat the audit request itself as consent.
+End the plan message with a plain-text question: which unprotected resources to remove, with sensible
+groupings to pick from (all high-confidence, by type, specific ids, nothing). Then stop and wait for the
+reply. Use `ask_user_question` only in a later turn, when the user's answer is ambiguous and there is
+nothing else to present. Never treat the audit request itself as consent.
 
 ## 5. Tear down, one resource per call
 
@@ -107,9 +113,10 @@ pauses.
 User: "Audit us-east-1 for wasted spend and show me the teardown plan."
 
 Expected: one `generate_cost_report` call for `us-east-1`; the aggregation script run against its
-`plan_id`; a table of findings with a headline such as `$26.26/month estimated waste, $26.26/month
-recoverable`; then a question asking which unprotected resources to remove. No `delete_resource` call
-until the user names resources, and one call per resource after that.
+`plan_id`; a final message holding the table of findings, a headline such as `$26.26/month estimated
+waste, $26.26/month recoverable`, and a closing question asking which unprotected resources to remove.
+No tool call on that message, no `delete_resource` call until the user names resources, and one call
+per resource after that.
 
 `evals/evals.json` holds three scenarios to re-run after changing this skill.
 
