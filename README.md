@@ -153,12 +153,13 @@ Google Cloud and Azure both publish official MCP servers that could play the `aw
 
 ## AI assistance disclosure
 
-Built with **Claude Code** (Anthropic) during the hackathon: it wrote the code, tests and scripts under
-the author's direction, and each step was reviewed and run against the real account. An initial
-design spec was drafted with an AI assistant and then corrected against the installed TrueForge (several
-of its API shapes were wrong; see `PLAN.md`). The agent itself ran on GLM-5.3 (`litellm/glm-latest`)
-via a LiteLLM gateway during development. No credentials or account identifiers are included in this
-repository.
+The initial architecture — the theme, the cloud-agnostic core with an AWS provider, the MCP server with a
+single approval-gated `delete_resource`, and the TrueForge agent on top — was designed by the author.
+That design was then refined with **Claude Code** (Anthropic), which checked it against the installed
+TrueForge, corrected the parts that did not match its real API (see `PLAN.md`), and was used to write the
+code, tests, scripts and documentation step by step, each step reviewed by the author and run against the
+real account. The agent itself ran on GLM-5.3 (`litellm/glm-latest`) through an OpenAI-compatible gateway
+during development. No credentials or account identifiers are included in this repository.
 
 ## License
 

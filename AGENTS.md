@@ -27,4 +27,5 @@ setup script. `scripts/` holds demo/ops shell scripts.
 - Small, focused commits; each build step in `PLAN.md` ends with its tests passing.
 
 ## AI assistance
-Built with Claude Code (disclosed in README). Keep the disclosure section accurate when tools change.
+The architecture was designed by the author and refined and implemented with Claude Code (disclosed in
+README). Keep the disclosure section accurate when tools change.
