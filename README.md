@@ -4,7 +4,8 @@ Finds idle EC2 instances, unattached volumes and empty load balancers in your AW
 what they cost per month, and deletes them. It only deletes after you click Allow.
 
 Built on [TrueForge](https://trueforge.dev), TrueFoundry's open-source agent harness, for the
-*Agents That Act* hackathon (TrueFoundry x Polaris, September 2026).
+*Agents That Act* hackathon (TrueFoundry x Polaris, September 2026). `SOLUTION.md` explains the
+architecture with diagrams; this file is about running it.
 
 ```
 you:    Audit us-east-1 for wasted cloud spend.
