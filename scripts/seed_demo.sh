@@ -62,7 +62,11 @@ fi
 INSTANCE=$(aws_ ec2 describe-instances --filters "Name=tag:Name,Values=$PREFIX-idle" "Name=instance-state-name,Values=pending,running,stopped" --query 'Reservations[0].Instances[0].InstanceId')
 if [ "$INSTANCE" = "None" ] || [ -z "$INSTANCE" ]; then
   say "Launching idle t3.micro"
-  AMI=$(aws_ ssm get-parameters --names /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query 'Parameters[0].Value')
+  # Latest Amazon Linux 2023 x86_64 AMI via DescribeImages (the SSM public parameter needs ssm:GetParameters,
+  # which a least-privilege user may not have).
+  AMI=$(aws_ ec2 describe-images --owners amazon \
+    --filters "Name=name,Values=al2023-ami-2023*-kernel-*-x86_64" "Name=state,Values=available" \
+    --query 'sort_by(Images,&CreationDate)[-1].ImageId')
   INSTANCE=$(aws_ ec2 run-instances --image-id "$AMI" --instance-type t3.micro --subnet-id "$SUBNET_A" --security-group-ids "$SG" \
     --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=8,VolumeType=gp3,DeleteOnTermination=true}' \
     --tag-specifications "$(tagspec instance idle)" "$(tagspec volume idle-root)" --query 'Instances[0].InstanceId')
