@@ -29,7 +29,7 @@ ALB=$(aws_ elbv2 describe-load-balancers --names "$PREFIX-alb" --query 'LoadBala
 if [ -n "$ALB" ] && [ "$ALB" != "None" ]; then
   aws_ elbv2 delete-load-balancer --load-balancer-arn "$ALB"
   aws --region "$REGION" elbv2 wait load-balancers-deleted --load-balancer-arns "$ALB"
-  echo "  deleted: ${ALB##*/loadbalancer/}"
+  echo "  deleted: ${ALB##*:loadbalancer/}"
 fi
 
 say "Volumes"

@@ -97,5 +97,5 @@ else
 fi
 
 say "Seeded (region $REGION):"
-printf '  instance       %s\n  volumes        %s\n  load balancer  %s\n  vpc            %s\n' "$INSTANCE" "${VOLS[*]}" "${ALB##*/loadbalancer/}" "$VPC"
+printf '  instance       %s\n  volumes        %s\n  load balancer  %s\n  vpc            %s\n' "$INSTANCE" "${VOLS[*]}" "${ALB##*:loadbalancer/}" "$VPC"
 echo "Give CloudWatch an hour or more to collect utilisation before the demo."

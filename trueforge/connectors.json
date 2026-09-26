@@ -1,0 +1,19 @@
+[
+  {
+    "manifest": {
+      "type": "remote",
+      "name": "aws-janitor",
+      "url": "http://127.0.0.1:${JANITOR_PORT}/mcp",
+      "description": "Cloud Cost Janitor: finds idle instances, orphaned volumes and idle load balancers, prices them, and tears them down only via the approval-gated delete_resource tool.",
+      "auth": { "type": "header", "headers": { "Authorization": "Bearer ${COST_JANITOR_TOKEN}" } }
+    }
+  },
+  {
+    "manifest": {
+      "type": "remote",
+      "name": "aws-api",
+      "url": "http://127.0.0.1:${AWS_API_PORT}/mcp",
+      "description": "Official AWS API MCP server (awslabs) running in READ-ONLY mode: run any read-only AWS CLI command for ad-hoc exploration. Cannot change anything."
+    }
+  }
+]
