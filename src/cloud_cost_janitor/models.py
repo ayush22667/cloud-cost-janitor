@@ -100,11 +100,18 @@ class Resource(_Serialisable):
 
 
 @dataclass
+class AttachedVolume(_Serialisable):
+    volume_id: str
+    volume_type: str
+    size_gb: int
+    is_root: bool = False
+
+
+@dataclass
 class Instance(Resource):
     instance_type: str = ""
     state: str = "running"  # running | stopped | ...
-    attached_volume_ids: list[str] = field(default_factory=list)
-    attached_volume_gb: int = 0
+    attached_volumes: list[AttachedVolume] = field(default_factory=list)
     metrics: UtilisationMetrics | None = None
 
     @property
