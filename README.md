@@ -118,17 +118,26 @@ model under Settings > Models, then register everything:
 ```bash
 OUTBOUND_URL_ALLOWED_HOSTS='["127.0.0.1","localhost"]' npx @truefoundry/trueforge     # terminal 1
 scripts/run_mcp_servers.sh                                                             # terminal 2
-SKILL_REPO_URL=https://github.com/ayush22667/cloud-cost-janitor MODEL=<provider/model> bash trueforge/setup.sh
+MODEL=<provider/model> bash trueforge/setup.sh
 ```
-
-The skill is registered from the release tag `v0.1.0` by default (`SKILL_REF` to change it).
 
 `setup.sh` checks that TrueForge, the model and both servers are up, registers the two connectors and
 the skill, and creates the agent. Open http://localhost:8790, go to Agents, and press Try.
 
 `MODEL` is whatever name TrueForge shows under Settings > Models, for example `openai/gpt-5.2`. I
-developed it on Kimi K3 behind an OpenAI-compatible gateway. Leave `SKILL_REPO_URL` out if you are
-working from a private fork; the same steps are then registered as inline instructions.
+developed it on Kimi K3 behind an OpenAI-compatible gateway.
+
+The skill is cloned by TrueForge from this repository at the release tag `v0.1.1`. Working from a fork?
+Set `SKILL_REPO_URL` to your fork (it must be public) and `SKILL_REF` to a tag or commit in it.
+
+### How the agent is split
+
+The agent definition follows the TrueForge docs: `trueforge/agent.json` holds only the role, the two
+connectors with their approval gates, and the runtime toggles. The procedure lives in
+`skills/cloud-cost-audit`, a skill in the [Agent Skills](https://agentskills.io) format: `SKILL.md` with
+the playbook, `scripts/aggregate_plan.py` the agent runs in the sandbox to total the plan, and
+`evals/evals.json` with the three scenarios to re-run after changing it. The frontmatter `description` is
+the only text the model sees before it loads the skill, so `setup.sh` registers that exact text.
 
 ## Configuration
 

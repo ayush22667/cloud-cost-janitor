@@ -46,26 +46,24 @@ python3 -c 'import json,sys; [print(json.dumps(c)) for c in json.load(sys.stdin)
   echo "  $name: $tools tools"
 done
 
-SKILL_OK=false
-if [ -n "${SKILL_REPO_URL:-}" ]; then
-  SKILL_REF="${SKILL_REF:-v0.1.0}"   # pin to a release tag; TrueForge clones this ref into the sandbox
-  say "Registering skill cloud-cost-audit from $SKILL_REPO_URL ($SKILL_REF)"
-  export SKILL_REF
-  skill_body=$(python3 -c 'import json,os; print(json.dumps({"manifest":{"type":"git","name":"cloud-cost-audit","url":os.environ["SKILL_REPO_URL"],"path":"skills/cloud-cost-audit","ref":os.environ["SKILL_REF"],"description":"Audit-to-teardown playbook for the aws-janitor MCP server: scan, aggregate in the sandbox, present, confirm, delete one resource per approved call."}}))')
-  code=$(curl -s -o /tmp/tf_setup_resp.json -w '%{http_code}' -X PUT "$API/settings/skills" -H 'content-type: application/json' -d "$skill_body")
-  if [ "$code" = "200" ] || [ "$code" = "201" ]; then SKILL_OK=true; echo "  registered"; else echo "  WARNING: skill registration failed (HTTP $code $(cat /tmp/tf_setup_resp.json)); agent will use inline instructions"; fi
-else
-  say "SKILL_REPO_URL not set: agent will use inline instructions (set it once the repo is public to attach the cloud-cost-audit skill)"
-fi
+SKILL_REPO_URL="${SKILL_REPO_URL:-https://github.com/ayush22667/cloud-cost-janitor}"   # must be a public GitHub/GitLab repo: TrueForge clones it into the sandbox
+SKILL_REF="${SKILL_REF:-v0.1.1}"   # pin a release tag; bump it when skills/cloud-cost-audit changes
+SKILL_DESCRIPTION=$(python3 -c '
+import re,sys
+text=open("skills/cloud-cost-audit/SKILL.md").read()
+m=re.match(r"---\n(.*?)\n---\n", text, re.S)
+fm=dict(l.split(":",1) for l in m.group(1).splitlines() if ":" in l and not l.startswith(" "))
+print(fm["description"].strip())')
+say "Registering skill cloud-cost-audit from $SKILL_REPO_URL ($SKILL_REF)"
+export SKILL_REPO_URL SKILL_REF SKILL_DESCRIPTION
+skill_body=$(python3 -c 'import json,os; print(json.dumps({"manifest":{"type":"git","name":"cloud-cost-audit","url":os.environ["SKILL_REPO_URL"],"path":"skills/cloud-cost-audit","ref":os.environ["SKILL_REF"],"description":os.environ["SKILL_DESCRIPTION"]}}))')
+code=$(curl -s -o /tmp/tf_setup_resp.json -w '%{http_code}' -X PUT "$API/settings/skills" -H 'content-type: application/json' -d "$skill_body")
+[ "$code" = "200" ] || [ "$code" = "201" ] || fail "skill registration: HTTP $code $(cat /tmp/tf_setup_resp.json)
+  The agent depends on this skill (its playbook lives there, not in the instructions). Check the repo is public and the tag exists."
+echo "  registered ($SKILL_REF)"
 
 say "Registering agent"
-agent_body=$(subst < trueforge/agent.json | python3 -c '
-import json,sys
-d=json.load(sys.stdin); use_skill=sys.argv[1]=="true"
-fallback=d.pop("_fallback_instructions"); d.pop("_comment", None)
-if not use_skill:
-    d["manifest"]["instructions"]=fallback; d["manifest"].pop("skills", None)
-print(json.dumps(d))' "$SKILL_OK")
+agent_body=$(subst < trueforge/agent.json)
 existing=$(curl -s "$API/agents?agent_name=cloud-cost-janitor" | jget "next((a['id'] for a in d['data'] if a['name']=='cloud-cost-janitor'), '')")
 if [ -n "$existing" ]; then
   update=$(printf '%s' "$agent_body" | jget "json.dumps({'description': d['description'], 'manifest': d['manifest']})")
