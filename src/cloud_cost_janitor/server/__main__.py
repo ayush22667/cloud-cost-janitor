@@ -32,7 +32,9 @@ def main() -> None:
         f"-> http://{settings.host}:{settings.port}/mcp",
         file=sys.stderr,
     )
-    create_app(settings, provider).run(transport="http", host=settings.host, port=settings.port)
+    # stateless_http: no per-client session ids, so a server restart is invisible to TrueForge's
+    # long-lived connector (otherwise it gets "Session not found" until it reinitialises).
+    create_app(settings, provider).run(transport="http", host=settings.host, port=settings.port, stateless_http=True)
 
 
 if __name__ == "__main__":
