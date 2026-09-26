@@ -379,6 +379,7 @@ source = { editable = "." }
 dependencies = [
     { name = "boto3" },
     { name = "fastmcp" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -393,6 +394,7 @@ dev = [
 requires-dist = [
     { name = "boto3", specifier = ">=1.43.103" },
     { name = "fastmcp", specifier = ">=4.0.10" },
+    { name = "python-dotenv", specifier = ">=1.2.3" },
 ]
 
 [package.metadata.requires-dev]
