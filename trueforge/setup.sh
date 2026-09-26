@@ -46,8 +46,24 @@ python3 -c 'import json,sys; [print(json.dumps(c)) for c in json.load(sys.stdin)
   echo "  $name: $tools tools"
 done
 
+SKILL_OK=false
+if [ -n "${SKILL_REPO_URL:-}" ]; then
+  say "Registering skill cloud-cost-audit from $SKILL_REPO_URL (${SKILL_REF:-main})"
+  skill_body=$(python3 -c 'import json,os; print(json.dumps({"manifest":{"type":"git","name":"cloud-cost-audit","url":os.environ["SKILL_REPO_URL"],"path":"skills/cloud-cost-audit","ref":os.environ.get("SKILL_REF","main"),"description":"Audit-to-teardown playbook for the aws-janitor MCP server: scan, aggregate in the sandbox, present, confirm, delete one resource per approved call."}}))')
+  code=$(curl -s -o /tmp/tf_setup_resp.json -w '%{http_code}' -X PUT "$API/settings/skills" -H 'content-type: application/json' -d "$skill_body")
+  if [ "$code" = "200" ] || [ "$code" = "201" ]; then SKILL_OK=true; echo "  registered"; else echo "  WARNING: skill registration failed (HTTP $code $(cat /tmp/tf_setup_resp.json)); agent will use inline instructions"; fi
+else
+  say "SKILL_REPO_URL not set: agent will use inline instructions (set it once the repo is public to attach the cloud-cost-audit skill)"
+fi
+
 say "Registering agent"
-agent_body=$(subst < trueforge/agent.json)
+agent_body=$(subst < trueforge/agent.json | python3 -c '
+import json,sys
+d=json.load(sys.stdin); use_skill=sys.argv[1]=="true"
+fallback=d.pop("_fallback_instructions"); d.pop("_comment", None)
+if not use_skill:
+    d["manifest"]["instructions"]=fallback; d["manifest"].pop("skills", None)
+print(json.dumps(d))' "$SKILL_OK")
 existing=$(curl -s "$API/agents?agent_name=cloud-cost-janitor" | jget "next((a['id'] for a in d['data'] if a['name']=='cloud-cost-janitor'), '')")
 if [ -n "$existing" ]; then
   update=$(printf '%s' "$agent_body" | jget "json.dumps({'description': d['description'], 'manifest': d['manifest']})")

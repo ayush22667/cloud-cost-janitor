@@ -57,6 +57,7 @@ src/cloud_cost_janitor/
 ├── planner/       ordered teardown plan, snapshot-first steps, plan_id registry, re-verification
 └── server/        FastMCP app: scan · plan · teardown tools, bearer auth
 trueforge/         agent.json, connectors.json, setup.sh (registers everything in TrueForge)
+skills/            cloud-cost-audit — the TrueForge skill holding the audit→teardown playbook
 scripts/           run_mcp_servers.sh · seed_demo.sh · cleanup_demo.sh · smoke_test.sh
 tests/             70 tests: rules, pricing, planner, moto-backed AWS adapter, in-memory MCP client, HTTP auth
 ```
@@ -117,6 +118,16 @@ MODEL=<provider/model> bash trueforge/setup.sh                                  
 
 `setup.sh` checks TrueForge, the model, and both servers, then creates (or updates) the agent
 **cloud-cost-janitor**. Open `http://localhost:8790 → Agents → cloud-cost-janitor → Try`.
+
+The audit → teardown playbook lives in a TrueForge **skill** (`skills/cloud-cost-audit/SKILL.md`), following
+the TrueForge guidance that instructions describe the role and procedures live in skills. TrueForge clones
+skills from a public git repo into the sandbox, so attach it by pointing `setup.sh` at this repository:
+
+```bash
+SKILL_REPO_URL=https://github.com/ayush22667/cloud-cost-janitor MODEL=<provider/model> bash trueforge/setup.sh
+```
+
+Without `SKILL_REPO_URL` (e.g. a private fork) the same steps are registered as inline instructions instead.
 
 The agent was developed on Kimi K3 through an OpenAI-compatible gateway; any model configured in
 TrueForge works — set `MODEL=<provider/model>` to the name TrueForge shows under Settings → Models

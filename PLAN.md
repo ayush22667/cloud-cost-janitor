@@ -171,5 +171,7 @@ Every directory has an `AGENTS.md` (purpose, rules for that directory, how to te
 - [x] Step 8 — official aws-api server read-only on :8001; delete refused by its policy
 - [x] Step 9 — connectors + agent registered via `trueforge/setup.sh`; gates confirmed in the API response
 - [x] Step 10 — full rehearsal through the agent: audit → Code Mode aggregation → Generative UI → question → Deny (nothing changed) → stale plan refused → fresh plan → Allow → snapshots + real deletion verified in AWS
-- [ ] Step 11 — README, secret scan, public repo
+- [x] Step 11 (docs) — README written, secret scan clean, disclosure worded; agent re-verified on Kimi K3
+- [x] TrueForge skill `skills/cloud-cost-audit` written (playbook + reference aggregation script); `setup.sh` attaches it via `SKILL_REPO_URL` once the repo is public, otherwise registers inline instructions
+- [ ] Publish public repo → re-run `SKILL_REPO_URL=… bash trueforge/setup.sh` → rehearse once with the skill attached
 - [ ] Step 12 — optional polish
