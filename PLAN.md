@@ -166,5 +166,10 @@ Every directory has an `AGENTS.md` (purpose, rules for that directory, how to te
 
 ## 7. Progress
 - [x] Step 0 — platform de-risk (allowlist, Code Mode, approval gate) verified 2026-09-26
-- [ ] Step 1 — skeleton
-- [ ] Step 2 … 12
+- [x] Steps 1–6 — skeleton, models/pricing/config, rules, AWS provider, planner, MCP server (70 tests)
+- [x] Step 7 — demo resources seeded in the personal account; scan finds ALB + 2 volumes ($18.03/mo)
+- [x] Step 8 — official aws-api server read-only on :8001; delete refused by its policy
+- [x] Step 9 — connectors + agent registered via `trueforge/setup.sh`; gates confirmed in the API response
+- [x] Step 10 — full rehearsal through the agent: audit → Code Mode aggregation → Generative UI → question → Deny (nothing changed) → stale plan refused → fresh plan → Allow → snapshots + real deletion verified in AWS
+- [ ] Step 11 — README, secret scan, public repo
+- [ ] Step 12 — optional polish
