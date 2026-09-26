@@ -1,11 +1,15 @@
-"""Entry point: ``uv run cloud-cost-janitor`` or ``python -m cloud_cost_janitor.server``."""
+"""Entry point: ``uv run cloud-cost-janitor`` or ``python -m cloud_cost_janitor.server``.
+
+Startup verifies that the configured AWS identity works and then serves. Nothing about that
+identity — account, principal, key id — is ever printed.
+"""
 
 from __future__ import annotations
 
 import sys
 
 from cloud_cost_janitor.config import load_settings
-from cloud_cost_janitor.providers import get_provider
+from cloud_cost_janitor.providers import ProviderError, get_provider
 from cloud_cost_janitor.server.app import create_app
 
 
@@ -13,8 +17,14 @@ def main() -> None:
     try:
         settings = load_settings()
         provider = get_provider(settings)
-    except Exception as e:  # configuration errors should be readable, not a traceback
+    except (ValueError, ProviderError) as e:  # configuration errors should be readable, not a traceback
         print(f"cloud-cost-janitor: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        provider.verify_credentials()  # fail fast; no point serving without working credentials
+    except ProviderError as e:
+        print(f"cloud-cost-janitor: AWS credentials rejected: {e}", file=sys.stderr)
         sys.exit(2)
 
     mode = "LIVE (ALLOW_DELETE=true)" if settings.allow_delete else "dry-run"

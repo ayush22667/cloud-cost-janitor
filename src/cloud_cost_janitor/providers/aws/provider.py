@@ -8,7 +8,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 from cloud_cost_janitor.models import Instance, LoadBalancer, Volume
 from cloud_cost_janitor.providers.aws import ec2, elb
-from cloud_cost_janitor.providers.aws.client import AwsClients
+from cloud_cost_janitor.providers.aws.client import AwsClients, AwsCredentials
 from cloud_cost_janitor.providers.base import CloudProvider, ProviderError
 
 
@@ -31,12 +31,20 @@ def _wrap(fn):
 
 
 class AwsProvider(CloudProvider):
-    def __init__(self, clients: AwsClients | None = None, *, profile: str | None = None) -> None:
-        self._c = clients or AwsClients(profile=profile)
+    def __init__(self, clients: AwsClients | None = None, *, credentials: AwsCredentials | None = None) -> None:
+        if clients is None:
+            if credentials is None:
+                raise ValueError("AwsProvider needs explicit credentials or a prepared AwsClients")
+            clients = AwsClients(credentials)
+        self._c = clients
 
     @property
     def name(self) -> str:
         return "aws"
+
+    @_wrap
+    def verify_credentials(self) -> None:
+        self._c.verify()
 
     @_wrap
     def list_regions(self) -> list[str]:

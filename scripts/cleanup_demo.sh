@@ -3,8 +3,13 @@
 #   instances -> load balancer -> volumes -> [snapshots the janitor made] -> security group -> IGW -> subnets -> VPC
 # Idempotent: skips what is already gone. Pass --snapshots to also delete pre-delete snapshots the janitor created.
 set -euo pipefail
+cd "$(dirname "$0")/.."
+# Same identity as the server: .env names it (AWS_PROFILE or key pair); nothing implicit.
+[ -f .env ] || { echo "missing .env (copy .env.example and set the AWS identity)"; exit 2; }
+set -a; . ./.env; set +a
+[ -n "${AWS_PROFILE:-}${AWS_ACCESS_KEY_ID:-}" ] || { echo "set AWS_PROFILE or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in .env"; exit 2; }
 
-REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+REGION="${AWS_REGIONS%%,*}"
 TAG_KEY=janitor-demo
 TAG_VAL=true
 PREFIX=janitor-demo

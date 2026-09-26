@@ -5,11 +5,12 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from cloud_cost_janitor.providers.aws.client import AwsClients
+from cloud_cost_janitor.providers.aws.client import AwsClients, AwsCredentials
 from cloud_cost_janitor.providers.aws.provider import AwsProvider
 
 REGION = "us-east-1"
 AMI = "ami-12345678"  # moto accepts any id
+TEST_CREDENTIALS = AwsCredentials(access_key_id="testing", secret_access_key="testing")  # explicit, as in production
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +29,7 @@ def mocked_aws():
 
 @pytest.fixture
 def provider(mocked_aws) -> AwsProvider:
-    return AwsProvider(AwsClients())
+    return AwsProvider(AwsClients(TEST_CREDENTIALS))
 
 
 @pytest.fixture

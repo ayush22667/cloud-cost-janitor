@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Cloud Cost Janitor cross-account access. Creates a role the janitor can assume from another account
+  (with an External ID) to audit this account and, only for resources tagged as allowed, snapshot and
+  delete them. No access keys are exchanged; delete this stack to revoke access.
+
+Parameters:
+  JanitorPrincipalArn:
+    Type: String
+    Description: ARN of the IAM user or role that runs the janitor (e.g. arn:aws:iam::111122223333:user/janitor).
+  ExternalId:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Shared secret the janitor must present when assuming the role (set AWS_EXTERNAL_ID to the same value).
+  AllowedTagKey:
+    Type: String
+    Default: janitor-demo
+    Description: Only resources carrying this tag can be snapshotted or deleted.
+  AllowedTagValue:
+    Type: String
+    Default: "true"
+
+Resources:
+  CloudCostJanitorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudCostJanitorRole
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref JanitorPrincipalArn
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: JanitorRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeRegions
+                  - ec2:DescribeSnapshots
+                  - ec2:DescribeTags
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DescribeTargetHealth
+                  - elasticloadbalancing:DescribeTags
+                  - cloudwatch:GetMetricStatistics
+                  - sts:GetCallerIdentity
+                Resource: "*"
+        - PolicyName: JanitorActionsOnTaggedResourcesOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ec2:CreateSnapshot, ec2:DeleteVolume, ec2:CreateTags, ec2:DeleteTags]
+                Resource: arn:aws:ec2:*:*:volume/*
+                Condition:
+                  StringEquals:
+                    !Sub "aws:ResourceTag/${AllowedTagKey}": !Ref AllowedTagValue
+              - Effect: Allow
+                Action: [ec2:TerminateInstances, ec2:CreateTags, ec2:DeleteTags]
+                Resource: arn:aws:ec2:*:*:instance/*
+                Condition:
+                  StringEquals:
+                    !Sub "aws:ResourceTag/${AllowedTagKey}": !Ref AllowedTagValue
+              - Effect: Allow
+                Action: [ec2:CreateTags]
+                Resource: arn:aws:ec2:*::snapshot/*
+                Condition:
+                  StringEquals:
+                    ec2:CreateAction: CreateSnapshot
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:AddTags
+                  - elasticloadbalancing:RemoveTags
+                Resource: arn:aws:elasticloadbalancing:*:*:loadbalancer/*
+                Condition:
+                  StringEquals:
+                    !Sub "aws:ResourceTag/${AllowedTagKey}": !Ref AllowedTagValue
+
+Outputs:
+  RoleArn:
+    Description: Set AWS_ROLE_ARN in the janitor's .env to this value.
+    Value: !GetAtt CloudCostJanitorRole.Arn

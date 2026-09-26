@@ -15,8 +15,3 @@ jobs:
           python-version: "3.12"
       - run: uv sync --frozen
       - run: uv run pytest -q
-        env:
-          # moto intercepts boto3; these dummy values keep botocore from looking for real credentials
-          AWS_ACCESS_KEY_ID: testing
-          AWS_SECRET_ACCESS_KEY: testing
-          AWS_DEFAULT_REGION: us-east-1

@@ -72,7 +72,7 @@ Every directory has an `AGENTS.md` describing its rules (with a `CLAUDE.md` that
 | Reaches a real system | boto3 against the operator's own AWS account (instances, volumes, load balancers, CloudWatch), plus AWS's official MCP server |
 | Generated code runs in a sandbox | The agent's instructions require an aggregation step written in Python and executed in the TrueForge sandbox; the session trace shows `sandbox.created` and `exec`. The sandbox never holds cloud credentials: its script reaches AWS only through `mcp_client.call_tool`, which is bridged back to the harness |
 | Stops for human approval before irreversible actions | `delete_resource` is annotated `destructiveHint` **and** listed by name in `require_approval_for_tools`; TrueForge pauses the turn with Allow / Deny. Verified: Deny leaves the resource untouched, Allow deletes it |
-| Own credentials only, no secrets in the repo | AWS credentials come from `~/.aws`; the MCP bearer token lives in `.env` (git-ignored); connector manifests use `${COST_JANITOR_TOKEN}` placeholders |
+| Own credentials only, no secrets in the repo | The AWS identity is named explicitly in `.env` (profile or key pair), verified at startup, never logged; the MCP bearer token lives in `.env` (git-ignored); connector manifests use `${COST_JANITOR_TOKEN}` placeholders |
 
 ## Safety model
 
@@ -104,8 +104,8 @@ skills fail to clone without it), and the AWS CLI configured with credentials fo
 ```bash
 git clone https://github.com/ayush22667/cloud-cost-janitor && cd cloud-cost-janitor
 uv sync
-cp .env.example .env            # then set COST_JANITOR_TOKEN to a random string
-uv run pytest                   # 70 tests, no AWS needed
+cp .env.example .env            # set COST_JANITOR_TOKEN (random string) and AWS_PROFILE (see Identity and access)
+uv run pytest                   # 93 tests, no AWS needed
 ```
 
 Start TrueForge with its outbound guard allowing loopback (it blocks `127.0.0.1` by default), add a
@@ -133,6 +133,45 @@ Without `SKILL_REPO_URL` (e.g. a private fork) the same steps are registered as 
 The agent was developed on Kimi K3 through an OpenAI-compatible gateway; any model configured in
 TrueForge works — set `MODEL=<provider/model>` to the name TrueForge shows under Settings → Models
 (for example `MODEL=openai/gpt-5.2` after adding an OpenAI provider).
+
+## Identity and access
+
+The server never guesses which AWS account it is working on. `.env` must name the identity explicitly —
+there is no fallback to the machine's default credentials — and the server verifies it at startup
+(`sts:GetCallerIdentity`) and refuses to run otherwise. **Nothing about the identity is ever logged**: no
+account id, principal or key id, not even masked.
+
+| Where the server runs | Put in `.env` | Where the secret lives |
+|---|---|---|
+| Your laptop (recommended) | `AWS_PROFILE=<name>` | `~/.aws` — ideally an SSO / IAM Identity Center profile (short-lived), else an access key with MFA |
+| Container / CI | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN`) | the platform's secret store, injected as env |
+
+Exactly one of the two must be set; setting both is rejected. This follows the same precedence design as
+the Terraform AWS provider and the awslabs MCP servers (name the profile explicitly), and AWS's guidance to
+prefer temporary credentials.
+
+### Least privilege, enforced by IAM
+
+`iam/janitor-read-policy.json` grants only the `Describe*`/CloudWatch calls the audit needs.
+`iam/janitor-actions-policy.json` grants snapshot/tag/delete **only on resources tagged
+`janitor-demo=true`** (`aws:ResourceTag` condition). Attach both to the janitor's IAM user or role: then even
+if the server's own tag guard were bypassed, AWS itself refuses to touch an untagged resource. Change the
+tag in the policy and in `DELETE_ONLY_TAGGED` for real use.
+
+### Auditing another account (no keys exchanged)
+
+The other account's owner deploys `iam/cross-account-role.yaml`, which creates `CloudCostJanitorRole`
+with the two policies above and a trust policy for *your* principal plus an External ID:
+
+```bash
+aws cloudformation deploy --stack-name cloud-cost-janitor --template-file iam/cross-account-role.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides JanitorPrincipalArn=arn:aws:iam::<your-account>:user/<you> ExternalId=<random-string>
+```
+
+You then set `AWS_ROLE_ARN=<RoleArn output>` and `AWS_EXTERNAL_ID=<the same string>` in `.env`. The
+janitor assumes the role with STS and works on auto-refreshing temporary credentials; deleting the stack
+revokes access. (The official `aws-api` server runs as the base identity, not the assumed role.)
 
 ## Demo
 

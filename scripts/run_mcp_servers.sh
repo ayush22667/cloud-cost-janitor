@@ -7,6 +7,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [ -f .env ] || { echo "missing .env (copy .env.example)"; exit 2; }
 set -a; . ./.env; set +a
+# Both servers use the identity named in .env (AWS_PROFILE or key pair). AWS_ROLE_ARN applies to the
+# janitor only; the official aws-api server runs as the base identity.
+[ -n "${AWS_PROFILE:-}${AWS_ACCESS_KEY_ID:-}" ] || { echo "set AWS_PROFILE or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in .env"; exit 2; }
 JANITOR_PORT="${JANITOR_PORT:-8000}"
 AWS_API_PORT="${AWS_API_PORT:-8001}"
 REGION="${AWS_REGIONS%%,*}"

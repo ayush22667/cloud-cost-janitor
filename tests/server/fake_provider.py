@@ -54,6 +54,9 @@ class FakeProvider(CloudProvider):
     def name(self) -> str:
         return "aws"
 
+    def verify_credentials(self) -> None:
+        self._maybe_fail()
+
     def _maybe_fail(self):
         if self.fail_with:
             raise ProviderError(self.fail_with)

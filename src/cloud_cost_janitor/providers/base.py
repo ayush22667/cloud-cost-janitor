@@ -24,6 +24,10 @@ class CloudProvider(ABC):
     def name(self) -> str:
         """'aws' | 'gcp' | 'azure'"""
 
+    @abstractmethod
+    def verify_credentials(self) -> None:
+        """Raise ProviderError if the configured identity cannot be used. Must not return or log who it is."""
+
     # --- discovery ---
     @abstractmethod
     def list_regions(self) -> list[str]: ...

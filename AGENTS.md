@@ -20,8 +20,11 @@ setup script. `scripts/` holds demo/ops shell scripts.
 - `delete_resource` is the **only** destructive tool. It is dry-run unless `ALLOW_DELETE=true`, refuses
   protected tags, refuses resources not in a live plan, and re-verifies the resource before deleting.
 - Never import boto3 outside `providers/aws/`. Never put cloud-specific shapes into `models`/`rules`/`planner`.
-- No secrets in the repo: tokens come from `.env` (git-ignored); AWS credentials from the host chain.
-  Never log or print credentials, and keep the AWS account id out of docs.
+- No secrets in the repo: tokens come from `.env` (git-ignored). The AWS identity is **named explicitly**
+  in `.env` (`AWS_PROFILE` or a key pair; optional `AWS_ROLE_ARN`) — never call `boto3.Session()` without
+  arguments and never fall back to the host's default credentials. Never log or print identity or
+  credentials (no account id, principal, key id), and keep account ids out of docs.
+- Least privilege is enforced twice: by the server's tag guard and by the IAM policies in `iam/`.
 - Every MCP tool declares `title`, `readOnlyHint`, `destructiveHint`.
 - Type hints everywhere; docstrings on tools are the text the model sees — keep them precise and short.
 - Small, focused commits; each build step in `PLAN.md` ends with its tests passing.
