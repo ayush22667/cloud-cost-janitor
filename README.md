@@ -118,8 +118,9 @@ MODEL=<provider/model> bash trueforge/setup.sh                                  
 `setup.sh` checks TrueForge, the model, and both servers, then creates (or updates) the agent
 **cloud-cost-janitor**. Open `http://localhost:8790 → Agents → cloud-cost-janitor → Try`.
 
-The agent was developed with `litellm/glm-latest` (GLM-5.3) through an OpenAI-compatible gateway; any
-model configured in TrueForge works — set `MODEL=openai/gpt-5.2` (after adding an OpenAI provider) to use OpenAI.
+The agent was developed on Kimi K3 through an OpenAI-compatible gateway; any model configured in
+TrueForge works — set `MODEL=<provider/model>` to the name TrueForge shows under Settings → Models
+(for example `MODEL=openai/gpt-5.2` after adding an OpenAI provider).
 
 ## Demo
 
@@ -158,8 +159,7 @@ single approval-gated `delete_resource`, and the TrueForge agent on top — was 
 That design was then refined with **Claude Code** (Anthropic), which checked it against the installed
 TrueForge, corrected the parts that did not match its real API (see `PLAN.md`), and was used to write the
 code, tests, scripts and documentation step by step, each step reviewed by the author and run against the
-real account. The agent itself ran on GLM-5.3 (`litellm/glm-latest`) through an OpenAI-compatible gateway
-during development. No credentials or account identifiers are included in this repository.
+real account. The agent itself ran on Kimi K3 through an OpenAI-compatible gateway during development. No credentials or account identifiers are included in this repository.
 
 ## License
 

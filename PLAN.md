@@ -17,7 +17,7 @@ This file is the working plan. It is updated as steps complete (see *Progress* a
 | Generated code must **run in a sandbox** | Aggregation of findings is done in TrueForge **Code Mode** (Python in the sandbox, calling MCP tools through `mcp_client`) — a required step in the agent instructions so the trace shows `sandbox.created` + `exec` | agent instructions |
 | **Stop for human approval** before irreversible actions | `delete_resource` is the only destructive tool; gated per-server with `require_approval_for_tools: ["@destructive","delete_resource"]` (verified: Deny blocks, Allow runs) | `server/`, `trueforge/agent.json` |
 | Own credentials only; **no secrets in repo/video** | boto3 default credential chain on the host; MCP bearer token from `.env` (git-ignored); `.omc/` ignored; no account ids in docs | `.gitignore`, `.env.example` |
-| **Disclose AI tools** in README | Architecture designed by the author, refined and implemented with Claude Code; runtime model via a LiteLLM gateway (GLM), OpenAI swap instructions | `README.md` |
+| **Disclose AI tools** in README | Architecture designed by the author, refined and implemented with Claude Code; runtime model Kimi K3 via an OpenAI-compatible gateway, OpenAI swap instructions | `README.md` |
 
 ## 2. What was verified before building (Step 0 — done)
 
@@ -81,7 +81,7 @@ flowchart LR
 
 **Official AWS server (aws-api):** `uvx awslabs.aws-api-mcp-server@latest` with `AWS_API_MCP_TRANSPORT=streamable-http`, `AWS_API_MCP_PORT=8001`, `READ_OPERATIONS_ONLY=true`, `AUTH_TYPE=no-auth` (loopback only). Attached to the agent with `enable_tools: ["call_aws","suggest_aws_commands"]` and `require_approval_for_tools: ["@all"]` (its single `call_aws` tool is unannotated, so gate everything).
 
-**Agent (TrueForge):** model `litellm/glm-latest`; sandbox on; `dynamic_sub_agents` off (sequential, stateful); `ask_user_questions` on; `generative_ui` on. Instructions: role + workflow (scan → aggregate in Code Mode → present plan with Generative UI → ask which resources → `delete_resource` **directly, one call per resource, never inside a script**).
+**Agent (TrueForge):** model Kimi K3 (set via `MODEL=<provider/model>` at setup); sandbox on; `dynamic_sub_agents` off (sequential, stateful); `ask_user_questions` on; `generative_ui` on. Instructions: role + workflow (scan → aggregate in Code Mode → present plan with Generative UI → ask which resources → `delete_resource` **directly, one call per resource, never inside a script**).
 
 ## 4. Repository layout
 

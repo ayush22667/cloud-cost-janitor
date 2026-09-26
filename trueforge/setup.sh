@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 TRUEFORGE_URL="${TRUEFORGE_URL:-http://localhost:8790}"
 API="$TRUEFORGE_URL/api/v1"
-MODEL="${MODEL:-litellm/glm-latest}"
+MODEL="${MODEL:?set MODEL=<provider/model> to a model configured in TrueForge (Settings -> Models)}"
 JANITOR_PORT="${JANITOR_PORT:-8000}"
 AWS_API_PORT="${AWS_API_PORT:-8001}"
 
