@@ -7,6 +7,7 @@ day over the last 7 days. A load balancer with no request datapoints served zero
 from __future__ import annotations
 
 from cloud_cost_janitor import pricing
+from cloud_cost_janitor.pricing import STATIC, PriceBook
 from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.models import Confidence, Finding, FindingStatus, LoadBalancer, TeardownAction
 from cloud_cost_janitor.rules.protection import protection_reason
@@ -16,7 +17,7 @@ HIGH_CONFIDENCE_MIN_DAYS = 7
 MEDIUM_CONFIDENCE_MIN_HOURS = 24.0
 
 
-def evaluate_load_balancer(lb: LoadBalancer, settings: Settings) -> Finding | None:
+def evaluate_load_balancer(lb: LoadBalancer, settings: Settings, prices: PriceBook = STATIC) -> Finding | None:
     prot = protection_reason(lb.tags, settings.protected_tags)
     m = lb.metrics
     requests = [d.request_count or 0 for d in m.days] if m else []
@@ -55,8 +56,8 @@ def evaluate_load_balancer(lb: LoadBalancer, settings: Settings) -> Finding | No
             "observed_hours": round(m.observed_hours, 1) if m else 0.0,
         },
         confidence=confidence,
-        monthly_cost_usd=pricing.load_balancer_monthly_cost(lb.lb_type),
-        cost_note=pricing.cost_note(lb.region, extra="hourly charge only, LCU excluded"),
+        monthly_cost_usd=pricing.load_balancer_monthly_cost(prices, lb.region, lb.lb_type),
+        cost_note=pricing.cost_note(prices, lb.region, extra="hourly charge only, LCU excluded"),
         protected=prot is not None,
         protection_reason=prot,
         teardown_action=TeardownAction.DELETE_LOAD_BALANCER,

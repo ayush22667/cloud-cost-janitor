@@ -57,6 +57,12 @@ class FakeProvider(CloudProvider):
     def verify_credentials(self) -> None:
         self._maybe_fail()
 
+    def actual_spend(self, *, days, group_by):
+        from cloud_cost_janitor.providers.base import SpendRow
+
+        self._maybe_fail()
+        return "2026-08-27", "2026-09-26", [SpendRow("Amazon Elastic Compute Cloud - Compute", 41.2), SpendRow("EC2 - Other", 3.4)]
+
     def _maybe_fail(self):
         if self.fail_with:
             raise ProviderError(self.fail_with)

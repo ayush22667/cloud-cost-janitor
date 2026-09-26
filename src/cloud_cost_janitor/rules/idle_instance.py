@@ -11,6 +11,7 @@ resource launched hours ago is still flagged, but with low confidence.
 from __future__ import annotations
 
 from cloud_cost_janitor import pricing
+from cloud_cost_janitor.pricing import STATIC, PriceBook
 from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.models import Confidence, Finding, FindingStatus, Instance, TeardownAction
 from cloud_cost_janitor.rules.protection import protection_reason
@@ -21,11 +22,11 @@ HIGH_CONFIDENCE_MIN_DAYS = 4  # Trusted Advisor: >= 4 of last 14 days
 MEDIUM_CONFIDENCE_MIN_HOURS = 24.0
 
 
-def _attached_volume_cost(inst: Instance) -> tuple[float, bool]:
+def _attached_volume_cost(inst: Instance, prices: PriceBook) -> tuple[float, bool]:
     """Sum of attached EBS cost; second value is True if any volume type was unpriced."""
     total, unpriced = 0.0, False
     for vol in inst.attached_volumes:
-        cost = pricing.volume_monthly_cost(vol.volume_type, vol.size_gb)
+        cost = pricing.volume_monthly_cost(prices, inst.region, vol.volume_type, vol.size_gb)
         if cost is None:
             unpriced = True
         else:
@@ -41,10 +42,10 @@ def _confidence(observed_days: int, observed_hours: float) -> Confidence:
     return Confidence.LOW
 
 
-def evaluate_instance(inst: Instance, settings: Settings) -> Finding | None:
+def evaluate_instance(inst: Instance, settings: Settings, prices: PriceBook = STATIC) -> Finding | None:
     """Return a Finding for a stopped or idle instance, else None."""
     prot = protection_reason(inst.tags, settings.protected_tags)
-    ebs_cost, ebs_unpriced = _attached_volume_cost(inst)
+    ebs_cost, ebs_unpriced = _attached_volume_cost(inst, prices)
 
     if inst.state == "stopped":
         return Finding(
@@ -62,7 +63,7 @@ def evaluate_instance(inst: Instance, settings: Settings) -> Finding | None:
             },
             confidence=Confidence.HIGH,
             monthly_cost_usd=None if ebs_unpriced and ebs_cost == 0 else ebs_cost,
-            cost_note=pricing.cost_note(inst.region, extra="stopped: EBS storage only"),
+            cost_note=pricing.cost_note(prices, inst.region, extra="stopped: EBS storage only"),
             protected=prot is not None,
             protection_reason=prot,
             teardown_action=TeardownAction.TERMINATE_INSTANCE,
@@ -88,7 +89,7 @@ def evaluate_instance(inst: Instance, settings: Settings) -> Finding | None:
     cpu_avgs = [d.cpu_avg_percent for d in m.days if d.cpu_avg_percent is not None]
     cpu_maxes = [d.cpu_max_percent for d in m.days if d.cpu_max_percent is not None]
     net = [d.network_bytes for d in m.days if d.network_bytes is not None]
-    compute_cost = pricing.instance_monthly_cost(inst.instance_type)
+    compute_cost = pricing.instance_monthly_cost(prices, inst.region, inst.instance_type)
     total_cost = None if compute_cost is None else round(compute_cost + ebs_cost, 2)
 
     return Finding(
@@ -114,7 +115,7 @@ def evaluate_instance(inst: Instance, settings: Settings) -> Finding | None:
         },
         confidence=_confidence(m.observed_days, m.observed_hours),
         monthly_cost_usd=total_cost,
-        cost_note=pricing.cost_note(inst.region, extra="compute + attached EBS"),
+        cost_note=pricing.cost_note(prices, inst.region, extra="compute + attached EBS"),
         protected=prot is not None,
         protection_reason=prot,
         teardown_action=TeardownAction.TERMINATE_INSTANCE,

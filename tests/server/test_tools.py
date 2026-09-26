@@ -13,7 +13,16 @@ EXPECTED_TOOLS = {
     "mark_for_teardown": (False, False),
     "unmark_teardown": (False, False),
     "delete_resource": (False, True),
+    "get_actual_spend": (True, False),
 }
+
+
+async def test_actual_spend_tool(client, fake):
+    res = (await client.call_tool("get_actual_spend", {"days": 30})).data
+    assert res["total_usd"] == 44.6 and res["rows"][0]["key"].startswith("Amazon Elastic")
+    fake.fail_with = "Cost Explorer is not enabled for this identity."
+    with pytest.raises(ToolError, match="not enabled"):
+        await client.call_tool("get_actual_spend", {})
 
 
 async def test_tools_and_annotations(client):

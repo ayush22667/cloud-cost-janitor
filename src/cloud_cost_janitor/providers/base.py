@@ -6,10 +6,23 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from cloud_cost_janitor.models import Instance, LoadBalancer, Volume
+from cloud_cost_janitor.pricing import STATIC, PriceBook
 
 
 class ProviderError(RuntimeError):
     """Raised for provider failures that the caller should surface to the user (permissions, not found)."""
+
+
+class SpendRow:
+    """One line of actual billed spend."""
+
+    __slots__ = ("key", "amount_usd")
+
+    def __init__(self, key: str, amount_usd: float) -> None:
+        self.key, self.amount_usd = key, amount_usd
+
+    def to_dict(self) -> dict[str, float | str]:
+        return {"key": self.key, "amount_usd": round(self.amount_usd, 2)}
 
 
 class CloudProvider(ABC):
@@ -27,6 +40,15 @@ class CloudProvider(ABC):
     @abstractmethod
     def verify_credentials(self) -> None:
         """Raise ProviderError if the configured identity cannot be used. Must not return or log who it is."""
+
+    # --- pricing and billing (optional; defaults keep a provider usable without them) ---
+    def price_book(self) -> PriceBook:
+        """Unit prices for estimates. Default: the static table."""
+        return STATIC
+
+    def actual_spend(self, *, days: int, group_by: str) -> tuple[str, str, list[SpendRow]]:
+        """Actual billed spend over the last ``days``: (start_date, end_date, rows). Raise ProviderError if unavailable."""
+        raise ProviderError(f"{self.name} provider does not expose billing data")
 
     # --- discovery ---
     @abstractmethod

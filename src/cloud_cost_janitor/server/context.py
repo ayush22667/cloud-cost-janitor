@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.planner import PlanRegistry
+from cloud_cost_janitor.pricing import PriceBook
 from cloud_cost_janitor.providers.base import CloudProvider
 
 
@@ -14,3 +15,7 @@ class ServerContext:
     settings: Settings
     provider: CloudProvider
     plans: PlanRegistry = field(default_factory=PlanRegistry)
+
+    @property
+    def prices(self) -> PriceBook:
+        return self.provider.price_book()

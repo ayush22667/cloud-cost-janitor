@@ -8,6 +8,7 @@ to automate.
 from __future__ import annotations
 
 from cloud_cost_janitor import pricing
+from cloud_cost_janitor.pricing import STATIC, PriceBook
 from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.models import Confidence, Finding, FindingStatus, TeardownAction, Volume
 from cloud_cost_janitor.rules.protection import protection_reason
@@ -15,7 +16,7 @@ from cloud_cost_janitor.rules.protection import protection_reason
 UNATTACHED_STATE = "available"
 
 
-def evaluate_volume(vol: Volume, settings: Settings) -> Finding | None:
+def evaluate_volume(vol: Volume, settings: Settings, prices: PriceBook = STATIC) -> Finding | None:
     if vol.state != UNATTACHED_STATE or vol.attached_instance_id:
         return None
     prot = protection_reason(vol.tags, settings.protected_tags)
@@ -29,8 +30,8 @@ def evaluate_volume(vol: Volume, settings: Settings) -> Finding | None:
         reason="Volume is not attached to any instance",
         evidence={"state": vol.state, "volume_type": vol.volume_type, "size_gb": vol.size_gb},
         confidence=Confidence.HIGH,
-        monthly_cost_usd=pricing.volume_monthly_cost(vol.volume_type, vol.size_gb),
-        cost_note=pricing.cost_note(vol.region, extra="storage only"),
+        monthly_cost_usd=pricing.volume_monthly_cost(prices, vol.region, vol.volume_type, vol.size_gb),
+        cost_note=pricing.cost_note(prices, vol.region, extra="storage only"),
         protected=prot is not None,
         protection_reason=prot,
         teardown_action=TeardownAction.DELETE_VOLUME,

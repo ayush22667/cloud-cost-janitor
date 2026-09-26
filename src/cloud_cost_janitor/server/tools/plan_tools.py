@@ -46,7 +46,7 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
                 scanned["instances"] += len(instances)
                 scanned["unattached_volumes"] += len(volumes)
                 scanned["load_balancers"] += len(lbs)
-                findings.extend(evaluate_all([*instances, *volumes, *lbs], ctx.settings))
+                findings.extend(evaluate_all([*instances, *volumes, *lbs], ctx.settings, ctx.prices))
         except ProviderError as e:
             raise ToolError(str(e)) from e
 

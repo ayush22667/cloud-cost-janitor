@@ -7,9 +7,12 @@ from datetime import datetime
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from cloud_cost_janitor.models import Instance, LoadBalancer, Volume
+from cloud_cost_janitor.pricing import PriceBook
 from cloud_cost_janitor.providers.aws import ec2, elb
 from cloud_cost_janitor.providers.aws.client import AwsClients, AwsCredentials
-from cloud_cost_janitor.providers.base import CloudProvider, ProviderError
+from cloud_cost_janitor.providers.aws.prices import live_price_book
+from cloud_cost_janitor.providers.aws.spend import actual_spend as ce_actual_spend
+from cloud_cost_janitor.providers.base import CloudProvider, ProviderError, SpendRow
 
 
 def _wrap(fn):
@@ -45,6 +48,15 @@ class AwsProvider(CloudProvider):
     @_wrap
     def verify_credentials(self) -> None:
         self._c.verify()
+
+    def price_book(self) -> PriceBook:
+        if not hasattr(self, "_prices"):
+            self._prices = live_price_book(self._c)
+        return self._prices
+
+    @_wrap
+    def actual_spend(self, *, days: int, group_by: str) -> tuple[str, str, list[SpendRow]]:
+        return ce_actual_spend(self._c, days=days, group_by=group_by)
 
     @_wrap
     def list_regions(self) -> list[str]:

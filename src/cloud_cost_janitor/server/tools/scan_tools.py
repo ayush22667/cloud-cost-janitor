@@ -51,7 +51,7 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
         Read-only. Use generate_cost_report for a full multi-resource scan with a plan_id."""
         def run():
             instances = ctx.provider.list_instances(region, lookback_days=lookback_days)
-            return _pack(region, "instances", len(instances), evaluate_all(instances, ctx.settings))
+            return _pack(region, "instances", len(instances), evaluate_all(instances, ctx.settings, ctx.prices))
 
         return _guard(run)
 
@@ -61,7 +61,7 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
         Returns findings with size, type and estimated monthly cost. Read-only."""
         def run():
             volumes = ctx.provider.list_unattached_volumes(region)
-            return _pack(region, "unattached_volumes", len(volumes), evaluate_all(volumes, ctx.settings))
+            return _pack(region, "unattached_volumes", len(volumes), evaluate_all(volumes, ctx.settings, ctx.prices))
 
         return _guard(run)
 
@@ -71,6 +71,6 @@ def register(mcp: FastMCP, ctx: ServerContext) -> None:
         Returns findings with target counts, requests/day and estimated monthly cost (hourly charge only). Read-only."""
         def run():
             lbs = ctx.provider.list_load_balancers(region, lookback_days=lookback_days)
-            return _pack(region, "load_balancers", len(lbs), evaluate_all(lbs, ctx.settings))
+            return _pack(region, "load_balancers", len(lbs), evaluate_all(lbs, ctx.settings, ctx.prices))
 
         return _guard(run)

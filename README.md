@@ -47,7 +47,7 @@ flowchart LR
 ```
 
 Three processes run on your machine. TrueForge hosts the agent and the chat. The `aws-janitor` MCP
-server (this repo) talks to AWS with boto3 and exposes nine tools, one of which is destructive.
+server (this repo) talks to AWS with boto3 and exposes ten tools, one of which is destructive.
 The official [awslabs AWS API server](https://awslabs.github.io/mcp/servers/aws-api-mcp-server) runs in
 read-only mode for ad-hoc questions like "what else is in that VPC".
 
@@ -83,9 +83,10 @@ flagged with low confidence rather than hidden.
 ```
 src/cloud_cost_janitor/
   models.py       resources, metrics, findings, plans
-  pricing.py      on-demand list prices (us-east-1) and monthly estimates
+  pricing.py      PriceBook interface, static us-east-1 fallback table, monthly estimates
   config.py       settings from .env: token, regions, AWS identity
   providers/      CloudProvider interface; aws/ is the only place boto3 is imported
+                  (EC2, EBS, ELBv2, CloudWatch, Price List API, Cost Explorer)
   rules/          pure functions: resource in, finding out
   planner/        ordered teardown plan, snapshot-first steps, plan registry, re-verification
   server/         FastMCP app: scan, plan and teardown tools, bearer auth
@@ -202,9 +203,12 @@ The same flow from a terminal: `scripts/smoke_test.sh new "Audit us-east-1..."`,
 
 ## Limitations
 
-Prices are us-east-1 on-demand list prices from a table in `pricing.py`. No Savings Plans, no LCU
-charges, no data transfer. The account this was built against does not allow the Pricing API; a live
-lookup and a Cost Explorer "actual spend" tool are the obvious next step.
+Prices come from the AWS Price List API for the region being scanned, cached for the life of the
+process; if that API is not permitted, a table of us-east-1 list prices in `pricing.py` answers
+instead and the `cost_note` says so. Either way the numbers are on-demand estimates: no Savings Plans,
+no LCU charges, no data transfer. `get_actual_spend` reads real billed spend from Cost Explorer so
+the two can be compared, but only after the account owner has enabled Cost Explorer and IAM access to
+billing data; until then the tool explains what to enable.
 
 Idle detection looks at CPU and network only. Classic ELBs are not covered. Only AWS is implemented;
 `CloudProvider` in `providers/base.py` is the seam for GCP or Azure, and both publish MCP servers that

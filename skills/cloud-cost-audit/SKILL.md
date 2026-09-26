@@ -58,7 +58,14 @@ user's Allow or Deny. Then report per resource:
 Never try to work around a refusal or a denial. If a resource is not in the current plan, regenerate the
 plan rather than guessing.
 
-## 6. Ad-hoc questions
+## 6. Real spend next to the estimate
+
+When the user asks what the account actually costs, or when presenting a plan for an account that is
+not a demo, call `get_actual_spend(days=30)` and show the top services next to the estimated waste
+("EC2 compute $412 last 30 days; $58/month of it is idle"). If the tool says Cost Explorer is not
+enabled, say exactly that and what the account owner must enable; do not guess a figure.
+
+## 7. Ad-hoc questions
 
 For "what else is in that VPC", "what does this instance run", etc., use `aws-api` (`call_aws` with a
 read-only AWS CLI command). Every call there is approval-gated; explain what the command does when it

@@ -11,7 +11,7 @@ from cloud_cost_janitor.config import Settings
 from cloud_cost_janitor.planner import PlanRegistry
 from cloud_cost_janitor.providers.base import CloudProvider
 from cloud_cost_janitor.server.context import ServerContext
-from cloud_cost_janitor.server.tools import plan_tools, scan_tools, teardown_tools
+from cloud_cost_janitor.server.tools import plan_tools, scan_tools, spend_tools, teardown_tools
 
 INSTRUCTIONS = (
     "Cloud Cost Janitor: finds idle instances, orphaned volumes and idle load balancers, prices them, and tears "
@@ -33,4 +33,5 @@ def create_app(settings: Settings, provider: CloudProvider, registry: PlanRegist
     scan_tools.register(mcp, ctx)
     plan_tools.register(mcp, ctx)
     teardown_tools.register(mcp, ctx)
+    spend_tools.register(mcp, ctx)
     return mcp
