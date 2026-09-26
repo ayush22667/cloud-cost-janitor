@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 from fastmcp.exceptions import ToolError
@@ -117,7 +118,7 @@ async def test_delete_snapshots_then_deletes(client, fake):
 
 
 async def test_untagged_volume_is_deletable_by_the_server(client, fake):
-    """Restricting *which* resources may be deleted is IAM's job (iam/), not a server-side allowlist."""
+    """Restricting *which* resources may be deleted is the identity's IAM policy's job, not a server-side allowlist."""
     pid = await _plan_id(client)
     res = (await client.call_tool("delete_resource", {"resource_type": "volume", "resource_id": "vol-untagged", "region": REGION, "plan_id": pid})).data
     assert res["deleted"] is True and fake.deleted == ["vol-untagged"]
@@ -191,4 +192,6 @@ async def test_plan_created_is_audited(client, audit):
     pid = await _plan_id(client)
     created = [e for e in audit.entries if e["event"] == "plan.created"]
     assert created and created[0]["plan_id"] == pid and "i-idle" in created[0]["findings"]
-    assert not any(k in json.dumps(audit.entries, default=str) for k in ("AKIA", "arn:aws:iam", "account_id"))
+    text = json.dumps(audit.entries, default=str)
+    assert not any(k in text for k in ("AKIA", "arn:aws", "account_id"))
+    assert not re.search(r"\b\d{12}\b", text)  # no account id, not even inside a resource id

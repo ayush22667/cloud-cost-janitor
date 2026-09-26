@@ -136,6 +136,25 @@ def test_lb_with_traffic_is_fine():
     assert evaluate_load_balancer(lb(registered_targets=2, healthy_targets=2, metrics=m), SETTINGS) is None
 
 
+def test_lb_serving_traffic_without_healthy_targets_is_not_flagged():
+    """Redirect-only listeners and Lambda targets serve requests with zero healthy targets."""
+    m = UtilisationMetrics(7, 168.0, [DailyStat(D0 + timedelta(days=i), request_count=250) for i in range(7)])
+    assert evaluate_load_balancer(lb(registered_targets=0, healthy_targets=0, metrics=m), SETTINGS) is None
+    assert evaluate_load_balancer(lb(registered_targets=2, healthy_targets=0, metrics=m), SETTINGS) is None
+
+
+def test_lb_with_no_healthy_targets_and_no_traffic_reports_both():
+    m = UtilisationMetrics(7, 168.0, [DailyStat(D0 + timedelta(days=i), request_count=0) for i in range(7)])
+    f = evaluate_load_balancer(lb(registered_targets=0, healthy_targets=0, metrics=m), SETTINGS)
+    assert f and f.confidence == Confidence.HIGH and "No healthy targets" in f.reason and "0 requests/day" in f.reason
+
+
+def test_lb_with_no_healthy_targets_but_little_history_is_low_confidence():
+    m = UtilisationMetrics(7, 3.0, [DailyStat(D0, request_count=0)])
+    f = evaluate_load_balancer(lb(registered_targets=0, healthy_targets=0, metrics=m), SETTINGS)
+    assert f and f.confidence == Confidence.LOW
+
+
 def test_lb_with_healthy_targets_and_no_metrics_is_not_flagged():
     assert evaluate_load_balancer(lb(registered_targets=2, healthy_targets=2, metrics=None), SETTINGS) is None
 

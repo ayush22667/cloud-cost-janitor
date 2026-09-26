@@ -1,6 +1,6 @@
 [project]
 name = "cloud-cost-janitor"
-version = "0.1.0"
+version = "0.1.3"
 description = "Agent that finds idle cloud resources, prices the waste, and tears them down only after human approval (TrueForge + MCP)."
 readme = "README.md"
 license = "MIT"

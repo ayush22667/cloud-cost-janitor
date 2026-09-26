@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from cloud_cost_janitor.config import IDENTITY_HELP, load_settings
@@ -109,3 +111,15 @@ def test_env_file_is_loaded(tmp_path):
 
 def test_help_text_names_both_options():
     assert "AWS_PROFILE" in IDENTITY_HELP and "AWS_ACCESS_KEY_ID" in IDENTITY_HELP
+
+
+def test_blank_aws_variables_are_dropped_from_the_environment(monkeypatch):
+    """A blank ``AWS_PROFILE=`` line in .env must not reach boto3, which would fail with ProfileNotFound."""
+    monkeypatch.setenv("COST_JANITOR_TOKEN", "abc")
+    monkeypatch.setenv("AWS_PROFILE", "")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "   ")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAEXAMPLE")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
+    s = load_settings(env_file=None)
+    assert s.aws_profile is None and s.aws_access_key_id == "AKIAEXAMPLE"
+    assert "AWS_PROFILE" not in os.environ and "AWS_SESSION_TOKEN" not in os.environ

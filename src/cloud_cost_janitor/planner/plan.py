@@ -125,7 +125,7 @@ def refusal_reason(finding: Finding, fresh: Resource | None, settings: Settings,
 
     Called immediately before acting, with a freshly described resource, so that anything that changed
     since the plan was built (attachment, traffic, a protect tag, a grace period) blocks the delete.
-    Which resources may be deleted at all is enforced by IAM (see iam/), not by a server-side allowlist.
+    Which resources may be deleted at all is enforced by the identity's IAM policy, not by a server-side allowlist.
     """
     today = today or _utcnow().date()
     if fresh is None:

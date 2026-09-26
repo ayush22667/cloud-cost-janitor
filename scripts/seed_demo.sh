@@ -2,7 +2,7 @@
 # Create a small amount of real, tagged "waste" in YOUR OWN AWS account for the demo.
 #   1 idle t3.micro instance, 2 unattached 10 GB gp3 volumes, 1 application load balancer with no targets,
 #   plus the VPC/subnets/IGW/security group the load balancer needs (the account has no default VPC).
-# Everything is tagged janitor-demo=true so the IAM actions policy (iam/) permits deleting it and
+# Everything is tagged janitor-demo=true so a tag-scoped IAM policy on the identity can permit deleting it and
 # cleanup_demo.sh can find it. Idempotent: re-running reuses what already exists.
 # Approx cost while running: ~$0.04/hour. Remove with scripts/cleanup_demo.sh.
 set -euo pipefail

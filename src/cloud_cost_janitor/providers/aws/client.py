@@ -56,22 +56,23 @@ class AwsCredentials:
         raise ValueError("AwsCredentials needs a profile or an access-key pair")
 
 
-def _assumed_session(base: boto3.Session, role_arn: str, external_id: str | None) -> boto3.Session:
-    params: dict[str, str] = {"RoleArn": role_arn, "RoleSessionName": ROLE_SESSION_NAME}
-    if external_id:
-        params["ExternalId"] = external_id
+def _assumed_session(credentials: AwsCredentials, base: boto3.Session) -> boto3.Session:
+    params: dict[str, str] = {"RoleArn": credentials.role_arn or "", "RoleSessionName": ROLE_SESSION_NAME}
+    if credentials.external_id:
+        params["ExternalId"] = credentials.external_id
     refresher = create_assume_role_refresher(base.client("sts", config=_RETRY), params)
     creds = DeferredRefreshableCredentials(refresh_using=refresher, method="assume-role")
-    session = boto3.Session()
-    # botocore's documented way to plug refreshable credentials into a session.
-    session._session._credentials = creds  # noqa: SLF001
+    # A second session built exactly like the base one (same explicit profile or key pair, never the host
+    # default chain), with botocore's documented way to plug refreshable credentials into it.
+    session = credentials.base_session()
+    session._session._credentials = creds
     return session
 
 
 class AwsClients:
     def __init__(self, credentials: AwsCredentials) -> None:
         base = credentials.base_session()
-        self._session = _assumed_session(base, credentials.role_arn, credentials.external_id) if credentials.role_arn else base
+        self._session = _assumed_session(credentials, base) if credentials.role_arn else base
 
     @lru_cache(maxsize=64)  # noqa: B019 - one client per (service, region) for the process lifetime
     def _client(self, service: str, region: str):

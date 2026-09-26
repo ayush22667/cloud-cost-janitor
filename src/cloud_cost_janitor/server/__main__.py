@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import sys
 
+from botocore.exceptions import BotoCoreError
+
 from cloud_cost_janitor.config import load_settings
 from cloud_cost_janitor.providers import ProviderError, get_provider
 from cloud_cost_janitor.server.app import create_app
@@ -17,7 +19,7 @@ def main() -> None:
     try:
         settings = load_settings()
         provider = get_provider(settings)
-    except (ValueError, ProviderError) as e:  # configuration errors should be readable, not a traceback
+    except (ValueError, ProviderError, BotoCoreError) as e:  # configuration errors should be readable, not a traceback
         print(f"cloud-cost-janitor: {e}", file=sys.stderr)
         sys.exit(2)
 

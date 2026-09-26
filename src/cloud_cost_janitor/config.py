@@ -13,7 +13,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Tags that mark a resource as never-delete. Case-sensitive on key and value, as in AWS.
+# Tags that mark a resource as never-delete. Case-insensitive on key and value (stricter than AWS: it
+# over-protects, never under-protects).
 DEFAULT_PROTECTED_TAGS: tuple[tuple[str, str], ...] = (
     ("env", "prod"),
     ("Environment", "Production"),
@@ -24,6 +25,9 @@ IDENTITY_HELP = (
     "AWS identity must be set in .env: AWS_PROFILE=<name> (recommended) "
     "or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (containers/CI). See .env.example."
 )
+
+
+_AWS_VARS = ("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_ROLE_ARN", "AWS_EXTERNAL_ID")
 
 
 def _env(name: str) -> str | None:
@@ -75,6 +79,11 @@ def load_settings(env_file: str | os.PathLike[str] | None = ".env") -> Settings:
     """
     if env_file and Path(env_file).exists():
         load_dotenv(env_file, override=False)
+    # A blank line such as ``AWS_PROFILE=`` in .env is exported as an empty string. This loader ignores
+    # blanks, but boto3 reads AWS_PROFILE itself and fails with ProfileNotFound, so drop them here.
+    for name in _AWS_VARS:
+        if name in os.environ and not os.environ[name].strip():
+            del os.environ[name]
 
     token = _env("COST_JANITOR_TOKEN")
     if not token:

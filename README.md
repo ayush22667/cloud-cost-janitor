@@ -72,8 +72,8 @@ The thresholds are AWS Trusted Advisor's, not mine.
 | Idle instance | running, daily CPU at or under 10% and network at or under 5 MB on every observed day of a 14-day window (first hour after launch ignored) |
 | Stopped instance | reported with its EBS cost only |
 | Orphaned volume | state `available` |
-| Idle load balancer | no healthy targets, or under 100 requests a day over 7 days |
-| Protected | tagged `env=prod`, `Environment=Production` or `janitor:keep=true`; reported, never planned |
+| Idle load balancer | an application load balancer with no healthy targets, unless it served 100 requests/day or more over the window (a redirect-only listener or Lambda targets can serve real traffic with no healthy targets to show); or under 100 requests a day over 7 days with healthy targets. Targets in state `unavailable` or `initial` count as healthy, since they are not proven idle. Non-application load balancers have no request metric and are judged on healthy targets alone |
+| Protected | tagged `env=prod`, `Environment=Production` or `janitor:keep=true`, matched case-insensitively on key and value; reported, never planned |
 
 Each finding carries a `confidence`. A box launched this morning has three hours of data, so it is
 flagged with low confidence rather than hidden.
@@ -90,11 +90,10 @@ src/cloud_cost_janitor/
   rules/          pure functions: resource in, finding out
   planner/        ordered teardown plan, snapshot-first steps, plan registry, re-verification
   server/         FastMCP app: scan, plan and teardown tools, bearer auth
-iam/              least-privilege policies and a cross-account CloudFormation template
 trueforge/        agent.json, connectors.json, setup.sh
 skills/           cloud-cost-audit, the TrueForge skill with the audit playbook
 scripts/          run_mcp_servers.sh, seed_demo.sh, cleanup_demo.sh, smoke_test.sh
-tests/            109 tests; AWS is mocked with moto, the MCP server is tested in-process
+tests/            unit and server tests; AWS is mocked with moto, the MCP server is tested in-process
 ```
 
 Each directory has an `AGENTS.md` with the rules for that directory.
@@ -127,8 +126,10 @@ the skill, and creates the agent. Open http://localhost:8790, go to Agents, and 
 `MODEL` is whatever name TrueForge shows under Settings > Models, for example `openai/gpt-5.2`. I
 developed it on Kimi K3 behind an OpenAI-compatible gateway.
 
-The skill is cloned by TrueForge from this repository at the release tag `v0.1.2`. Working from a fork?
-Set `SKILL_REPO_URL` to your fork (it must be public) and `SKILL_REF` to a tag or commit in it.
+The skill is required: `setup.sh` registers it from a pinned release tag of this repository (currently
+`v0.1.3`; there is no fallback if the registration fails) and fails if the repo is not public or the tag
+does not exist. Working from a fork? Set `SKILL_REPO_URL` to your fork (it must be public) and `SKILL_REF`
+to a tag or commit in it.
 
 ### How the agent is split
 
@@ -153,36 +154,34 @@ missing, and it never logs which account it is talking to.
 | `AWS_REGIONS` | comma-separated, default `us-east-1` |
 | `JANITOR_HOST`, `JANITOR_PORT` | default `127.0.0.1:8000` |
 | `JANITOR_AUDIT_LOG` | append-only JSONL, default `janitor-audit.jsonl` |
+| `CLOUD_PROVIDER` | default `aws`, the only one implemented |
 
-Set either a profile or a key pair, not both.
+Set either a profile or a key pair, not both. A blank `AWS_*` line in `.env` is treated as unset, not as an
+empty value.
 
 There is deliberately no fallback to whatever credentials happen to be on the machine.
 
-### IAM
+### Scoping the identity
 
-Two policies in `iam/` cover what the janitor needs. `janitor-read-policy.json` is the `Describe*`
-and CloudWatch calls. `janitor-actions-policy.json` allows snapshot, tag and delete, but only on
-resources carrying the tag `janitor-demo=true`. That condition is the real guard: the server has no
-allowlist of its own, so there is nothing to misconfigure, and AWS refuses anything the agent asks for
-outside it. Change the tag in the policy for your own use.
+The server ships no allowlist of its own. Which resources the identity may touch at all is the IAM
+policy on the user or role you name in `.env`, and that is yours to write. Keep it small: `Describe*` on
+EC2, ELBv2 and CloudWatch for the scan; `CreateSnapshot`, `CreateTags`, `DeleteVolume`,
+`TerminateInstances` and `DeleteLoadBalancer` only on resources that carry a tag you choose, such as
+`janitor-demo=true`; `pricing:GetProducts` and `ce:GetCostAndUsage` if you want live prices and
+`get_actual_spend`. Without the last two, pricing falls back to the static table and `get_actual_spend`
+fails with an explanation. If you attach broader rights to seed the demo, remove them before the demo.
 
-`janitor-demo-seed-policy.json` is only for the demo scripts. Remove it afterwards.
+When AWS refuses a call, the agent sees `AWS UnauthorizedOperation: IAM denied DeleteVolume` and nothing
+else: the principal and account in AWS's own message never reach the model or the audit log.
 
 ### Another account
 
-The other account's owner deploys `iam/cross-account-role.yaml`. It creates a role with the two
-policies above and a trust policy for your principal plus an External ID.
-
-```bash
-aws cloudformation deploy --stack-name cloud-cost-janitor --template-file iam/cross-account-role.yaml \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides JanitorPrincipalArn=arn:aws:iam::<your-account>:user/<you> ExternalId=<random-string>
-```
-
-Put the role ARN and the same string in `.env` as `AWS_ROLE_ARN` and `AWS_EXTERNAL_ID`. The server
-assumes the role with STS and refreshes the temporary credentials itself; `run_mcp_servers.sh` assumes
-it once more for the official `aws-api` server, so both act as the same role (that one expires after
-an hour, restart the script). Deleting the stack revokes access. No keys change hands.
+Create a role in the other account that trusts your principal and requires an External ID, with the
+same scoped permissions. Put its ARN and the shared string in `.env` as `AWS_ROLE_ARN` and
+`AWS_EXTERNAL_ID`. The server assumes the role with STS and refreshes the temporary credentials itself;
+`run_mcp_servers.sh` assumes it once more for the official `aws-api` server, so both act as the same
+role (that one expires after an hour, restart the script). Deleting the role revokes access. No keys
+change hands.
 
 ## What stops it deleting the wrong thing
 
@@ -191,7 +190,8 @@ an hour, restart the script). Deleting the stack revokes access. No keys change 
 2. A call needs a `plan_id` from a report less than an hour old. A server restart forgets all plans, on
    purpose. History lives in the audit log instead (below).
 3. The resource is described again right before deletion and refused if it is now attached, running,
-   has healthy targets, gained a protect tag (matched case-insensitively), or is gone.
+   has more healthy targets than the plan expected, gained a protect tag (matched case-insensitively), or
+   is gone.
 4. Volumes, and the volumes of an instance, are snapshotted first, tagged with the resource's own tags
    plus the plan id. A retry reuses the snapshot instead of taking another, and if the delete fails
    after the snapshot the result still lists the snapshot ids. Pass `wait_for_snapshot=true` to block
@@ -207,7 +207,9 @@ an hour, restart the script). Deleting the stack revokes access. No keys change 
    pinned in `scripts/run_mcp_servers.sh`, and the skill is registered from a release tag, not `main`.
 9. Everything the server is asked to do is appended to `janitor-audit.jsonl` (path from
    `JANITOR_AUDIT_LOG`): plans, requests, refusals with reasons, deletions with snapshot ids. It never
-   contains the identity or a credential.
+   contains the identity or a credential, and AWS error messages are redacted before they reach it or the
+   model: an IAM denial becomes "IAM denied \<operation\> on \<resource\>", and any ARN or account id in
+   another AWS message is stripped.
 10. The agent is told that resource names, tags and descriptions are data, never instructions, since
     anyone who can tag a resource can write text the model will read.
 
@@ -235,9 +237,15 @@ no LCU charges, no data transfer. `get_actual_spend` reads real billed spend fro
 the two can be compared, but only after the account owner has enabled Cost Explorer and IAM access to
 billing data; until then the tool explains what to enable.
 
-Idle detection looks at CPU and network only, over a window of 1 to 365 days. Classic ELBs are not covered. Only AWS is implemented;
-`CloudProvider` in `providers/base.py` is the seam for GCP or Azure, and both publish MCP servers that
-could take the `aws-api` role. Plans live in memory.
+Idle detection looks at CPU and network only, over a window of 1 to 365 days. Classic ELBs are not covered
+(they are a separate, older API that `providers/aws/elb.py` never calls). Auto Scaling group members
+are not excluded from idle-instance findings, so a healthy group running below its scale-in threshold can
+still be flagged. Only AWS is implemented; `CloudProvider` in `providers/base.py` is the seam for GCP or
+Azure, and both publish MCP servers that could take the `aws-api` role. Plans live in memory.
+
+The delete-time check on a load balancer re-reads its state and target health only, not traffic: a load
+balancer that went idle-by-traffic in the plan is not re-checked against fresh request counts before
+deletion, only against whether it has gained healthy targets since.
 
 TrueForge's local sandbox can only reach PyPI and GitHub, which is why all AWS calls live in the
 server and not in generated code.

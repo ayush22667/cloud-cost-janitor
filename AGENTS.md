@@ -19,13 +19,15 @@ setup script. `scripts/` holds demo/ops shell scripts.
 ## Rules that must not be broken
 - `delete_resource` is the **only** destructive tool. It runs only after the user approves the call in
   TrueForge, refuses protected tags and resources not in a live plan, re-verifies the resource, and
-  snapshots stateful data first. Which resources the identity may delete at all is IAM's job (`iam/`).
+  snapshots stateful data first. Which resources the identity may delete at all is the job of the IAM policy on the identity named in `.env`.
 - Never import boto3 outside `providers/aws/`. Never put cloud-specific shapes into `models`/`rules`/`planner`.
 - No secrets in the repo: tokens come from `.env` (git-ignored). The AWS identity is **named explicitly**
   in `.env` (`AWS_PROFILE` or a key pair; optional `AWS_ROLE_ARN`) — never call `boto3.Session()` without
   arguments and never fall back to the host's default credentials. Never log or print identity or
-  credentials (no account id, principal, key id), and keep account ids out of docs.
-- Least privilege is enforced by the IAM policies in `iam/`, not by server-side allowlists.
+  credentials (no account id, principal, key id), and keep account ids out of docs. AWS error messages are
+  redacted before they reach the model or the audit log: an IAM denial becomes `"IAM denied <operation> on
+  <resource>"`, and any ARN or account id in another AWS message is stripped.
+- Least privilege is the operator's IAM policy on the identity, not a server-side allowlist; the repo ships none.
 - Every MCP tool declares `title`, `readOnlyHint`, `destructiveHint`.
 - Type hints everywhere; docstrings on tools are the text the model sees — keep them precise and short.
 - Small, focused commits; each build step in `PLAN.md` ends with its tests passing.

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
-from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
 from cloud_cost_janitor.models import Instance, LoadBalancer, Volume
 from cloud_cost_janitor.pricing import PriceBook
@@ -15,8 +16,23 @@ from cloud_cost_janitor.providers.aws.spend import actual_spend as ce_actual_spe
 from cloud_cost_janitor.providers.base import CloudProvider, ProviderError, SpendRow
 
 
+# IAM refusals name the principal ARN and the account; other AWS messages can embed ARNs too. None of
+# that may reach the model, the chat or the audit log.
+_DENIED_CODES = frozenset({"AccessDenied", "AccessDeniedException", "UnauthorizedOperation", "Client.UnauthorizedOperation"})
+_ARN_RE = re.compile(r"arn:aws[^\s'\"(),;]*")
+_ACCOUNT_RE = re.compile(r"\b\d{12}\b")
+_ENCODED_RE = re.compile(r"\s*Encoded authorization failure message:.*$", re.DOTALL)
+
+
+def redact(message: str) -> str:
+    """Strip ARNs, account ids and encoded authorization blobs from an AWS error message."""
+    message = _ENCODED_RE.sub("", message)
+    message = _ARN_RE.sub("<arn>", message)
+    return _ACCOUNT_RE.sub("<account>", message)
+
+
 def _wrap(fn):
-    """Turn boto errors into ProviderError with a message the agent can act on."""
+    """Turn boto errors into ProviderError with a message the agent can act on, never one that leaks identity."""
 
     def inner(*args, **kwargs):
         try:
@@ -25,8 +41,12 @@ def _wrap(fn):
             raise ProviderError("No AWS credentials found on the host (configure ~/.aws or AWS_PROFILE)") from e
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "ClientError")
+            if code in _DENIED_CODES:
+                raise ProviderError(f"AWS {code}: IAM denied {e.operation_name}") from e
             msg = e.response.get("Error", {}).get("Message", str(e))
-            raise ProviderError(f"AWS {code}: {msg}") from e
+            raise ProviderError(f"AWS {code}: {redact(msg)}") from e
+        except BotoCoreError as e:  # expired SSO token, endpoint timeouts, ...
+            raise ProviderError(f"AWS {type(e).__name__}: {redact(str(e))}") from e
 
     inner.__name__ = fn.__name__
     inner.__doc__ = fn.__doc__
@@ -100,17 +120,17 @@ class AwsProvider(CloudProvider):
 
     @_wrap
     def tag_resources(self, region: str, resource_ids: list[str], tags: dict[str, str]) -> None:
-        arns = [r for r in resource_ids if r.startswith("arn:")]
-        ids = [r for r in resource_ids if not r.startswith("arn:")]
+        lbs = [r for r in resource_ids if elb.is_load_balancer_id(r)]
+        ids = [r for r in resource_ids if not elb.is_load_balancer_id(r)]
         ec2.tag_resources(self._c, region, ids, tags)
-        elb.tag_load_balancers(self._c, region, arns, tags)
+        elb.tag_load_balancers(self._c, region, lbs, tags)
 
     @_wrap
     def untag_resources(self, region: str, resource_ids: list[str], keys: list[str]) -> None:
-        arns = [r for r in resource_ids if r.startswith("arn:")]
-        ids = [r for r in resource_ids if not r.startswith("arn:")]
+        lbs = [r for r in resource_ids if elb.is_load_balancer_id(r)]
+        ids = [r for r in resource_ids if not elb.is_load_balancer_id(r)]
         ec2.untag_resources(self._c, region, ids, keys)
-        elb.untag_load_balancers(self._c, region, arns, keys)
+        elb.untag_load_balancers(self._c, region, lbs, keys)
 
     @_wrap
     def terminate_instance(self, region: str, instance_id: str) -> None:
